@@ -27,12 +27,15 @@ Verified against the installed inspect-ai provider: model id
   `dmb.models.modal_model_id`).
 - The scaffold's server file is **untested**; the inference-spike issue
   owns first deploy + verification.
-- Status: **blocked — Modal auth failing.** `modal profile list` reports the
-  `sanggusti` profile misconfigured and API calls fail despite network
-  connectivity. Operator action: run `modal setup` in a terminal and confirm
-  with `modal volume list`. Then:
+- Status: **verified 2026-10-27** (smoke 1.0, forest_fire limit-1 0.627).
+  Deployment stopped after verification; redeploy any time with
   `modal deploy infra/modal/vllm_server.py`, record the serve URL as
-  `MODAL_BASE_URL=<url>/v1` in `.env`, and update `docs/specs.md`.
+  `MODAL_BASE_URL=<url>/v1` in `.env`, and keep `docs/specs.md` current.
+- Gotchas observed: vLLM must be pinned (0.21.0 on CUDA 12.9; 0.32 on
+  CUDA 12.4 crashes in FlashInfer JIT); tool calling needs
+  `--enable-auto-tool-choice --tool-call-parser hermes`; the sandbox
+  blocks Modal's connection (DNS), so Modal commands need an unsandboxed
+  shell.
 
 ## Verification ladder
 

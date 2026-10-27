@@ -11,6 +11,7 @@ affected issue.
 |---|---|
 | Python | 3.10.4 (venv `.venv`, setuptools backend) |
 | inspect-ai | 0.3.280 |
+| openai client | 3.39.0 (required by inspect-ai OpenAI-compatible provider) |
 | pyyaml | 6.0.3 |
 | pytest | 9.1.1 |
 | Modal client | 1.1.4 |
@@ -24,9 +25,10 @@ affected issue.
 | Baseten model id | `openai-api/baseten/<slug>` | verified (routing) |
 | Baseten slug | TBD at credit time; must support tool calling + vision | **pending (credits)** |
 | Modal model id | `openai-api/modal/<name>` | verified (routing) |
-| Modal server | `infra/modal/vllm_server.py`, vLLM OpenAI-compatible, default `Qwen/Qwen2.5-7B-Instruct` on A10G | code ready, deploy pending |
-| Modal auth | `modal` 1.1.4 fails to reach API (stale `~/.modal.toml`, profile misconfigured) | **blocked: operator must run `modal setup`** |
-| `MODAL_BASE_URL` | `<serve-url>/v1` after `modal deploy` | pending (deploy) |
+| Modal server | `infra/modal/vllm_server.py`: CUDA 12.9 image, vLLM 0.21.0, `Qwen/Qwen2.5-7B-Instruct` on A10G, `--enable-auto-tool-choice --tool-call-parser hermes` | verified 2026-10-27 |
+| Modal endpoint | `https://sanggusti--dmb-vllm-openai-compatible-serve.us-east.modal.run` (`/v1` suffix for `MODAL_BASE_URL`) | verified, deployment stopped after verification |
+| Modal auth | operator `modal setup` completed 2026-10-27 | working (unsandboxed; sandbox DNS blocks Modal client) |
+| Modal results | smoke accuracy 1.0; forest_fire limit-1 composite 0.627 (19 tool calls) | eval logs in `logs/`, registry `verify-modal-*` |
 
 No provider-backed run has succeeded yet. First success criteria live in #1.
 
@@ -68,3 +70,5 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 
 - 2026-10-27: scaffold merged (#10). Modal auth failing — operator action.
   Baseten credits pending — provider runs blocked.
+- 2026-10-27: Modal re-login verified; vLLM server deployed, smoke + mission
+  evals pass, deployment stopped. Baseten still pending.
