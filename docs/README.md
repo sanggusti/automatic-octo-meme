@@ -5,6 +5,7 @@ advisors** in simulated 3D disaster environments.
 
 | Doc | Contents |
 |---|---|
+| [specs](specs.md) | Pinned versions, endpoints, budgets, status |
 | [architecture](architecture.md) | System layout, eval loop, package map |
 | [compute-split](compute-split.md) | Where each workload runs + trade-off analysis |
 | [action-surface](action-surface.md) | ArduPilot-derived drone tools and skills |

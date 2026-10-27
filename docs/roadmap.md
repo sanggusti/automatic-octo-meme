@@ -1,10 +1,11 @@
 # Roadmap
 
 Ordered workstreams; each owns a GitHub issue. Dependencies flow top-down.
+Status as of 2026-10-27 in brackets.
 
 1. **Inference spike** (#1) — first verified Baseten + Modal runs through the
-   smoke and forest-fire tasks. Needs provider credentials. Unblocks all
-   real-model work.
+   smoke and forest-fire tasks. [blocked: Modal re-login + Baseten credits,
+   both operator actions] Unblocks all real-model work.
 2. **Sim spike (Track 1)** (#2) — pinned image builds; SITL+Gazebo boots;
    scripted GUIDED takeoff/hover/land; MAVLink message set documented;
    `GazeboSITLBridge` implemented against the `SimBridge` contract.
@@ -18,5 +19,5 @@ Ordered workstreams; each owns a GitHub issue. Dependencies flow top-down.
 6. **Fidelity track (Track 2)** (#6) — Colosseum/Unreal on the GPU workstation,
    `ColosseumBridge`, one parported scenario.
 7. **Baseline sweep** (#7) — 2–3 Baseten models + 1 Modal custom model over the
-   full scenario pack; first published results table.
+   full scenario pack; first published results table. [blocked on #1, #4]
 8. **Results aggregation** (#8) — `runs/*/scores.json` → tables/plots script.
