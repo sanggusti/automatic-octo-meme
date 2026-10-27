@@ -69,12 +69,14 @@ class MockBridge(SimBridge):
         self.drone = DroneState()
         self.victims: list[Victim] = []
         self.hazards: list[dict] = []
+        self.phases: list[dict] = []
         self.width = 10
         self.height = 10
         self.steps = 0
         self.safety_violations = 0
         self.seed = 0
         self.scenario = "mock"
+        self._announced_phase: str | None = None
 
     @classmethod
     def from_metadata(cls, metadata: dict, **kwargs: object) -> "MockBridge":
@@ -90,9 +92,11 @@ class MockBridge(SimBridge):
         self.seed = int(metadata.get("seed", 0))
         self.victims = [Victim(**v) for v in metadata.get("victim_placements", [])]
         self.hazards = list(metadata.get("hazards", []))
+        self.phases = list(metadata.get("difficulty", {}).get("phases", []))
         self.drone = DroneState(battery_pct=100.0)
         self.steps = 0
         self.safety_violations = 0
+        self._announced_phase = None
         return self._observe("Episode start. Drone on pad at (0, 0), disarmed.")
 
     # -- primitives -----------------------------------------------------
@@ -101,8 +105,23 @@ class MockBridge(SimBridge):
         if self.drone.airborne:
             self.drone.battery_pct = max(0.0, self.drone.battery_pct - self.battery_drain)
 
+    def current_phase_index(self) -> int:
+        """Index into self.phases by step count; 0 when no phases defined."""
+        for i, phase in enumerate(self.phases):
+            if self.steps < int(phase.get("until_step", 0)):
+                return i
+        return max(0, len(self.phases) - 1)
+
+    def current_phase(self) -> str:
+        if not self.phases:
+            return "nominal"
+        return str(self.phases[self.current_phase_index()].get("name", "nominal"))
+
     def _in_hazard(self, x: int, y: int) -> bool:
+        phase_idx = self.current_phase_index()
         for hz in self.hazards:
+            if int(hz.get("active_from_phase", 0)) > phase_idx:
+                continue
             cx, cy, r = int(hz.get("x", -1)), int(hz.get("y", -1)), float(hz.get("radius", 0))
             if math.hypot(x - cx, y - cy) <= r:
                 return True
@@ -179,6 +198,10 @@ class MockBridge(SimBridge):
         victim.found = True
 
     def _observe(self, event: str) -> Observation:
+        phase = self.current_phase()
+        if phase != self._announced_phase:
+            self._announced_phase = phase
+            event = f"{event} [phase: {phase}]"
         telemetry = {
             "x": self.drone.x,
             "y": self.drone.y,
@@ -188,6 +211,7 @@ class MockBridge(SimBridge):
             "battery_pct": round(self.drone.battery_pct, 1),
             "steps": self.steps,
             "safety_violations": self.safety_violations,
+            "phase": phase,
         }
         return Observation(text=event, telemetry=telemetry)
 
@@ -197,6 +221,7 @@ class MockBridge(SimBridge):
             "seed": self.seed,
             "steps": self.steps,
             "step_budget": self.step_budget,
+            "phase": self.current_phase(),
             "safety_violations": self.safety_violations,
             "drone": {
                 "x": self.drone.x,

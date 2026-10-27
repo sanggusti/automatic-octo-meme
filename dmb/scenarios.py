@@ -126,6 +126,7 @@ def build_samples(
                     "victim_placements": placements,
                     "hazards": config.hazards,
                     "weather": config.weather,
+                    "difficulty": config.difficulty,
                     "world_hash": world_hash(scenario, seed, placements),
                 },
             )
