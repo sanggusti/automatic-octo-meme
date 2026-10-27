@@ -11,6 +11,8 @@ advisors** in simulated 3D disaster environments.
 | [action-surface](action-surface.md) | ArduPilot-derived drone tools and skills |
 | [edge-perception](edge-perception.md) | Edge-first vision design and budgets |
 | [scenarios](scenarios.md) | Disaster scenario catalog and generator |
+| [watcher](watcher.md) | Scenario watcher: observability & replay |
+| [physics-assets](physics-assets.md) | Physics asset catalog plan |
 | [metrics](metrics.md) | Score vector, weights, and metric roadmap |
 | [inference](inference.md) | Baseten + Modal model routing through inspect-ai |
 | [tracking](tracking.md) | Run registry, eval logs, reproducibility contract |
