@@ -1,0 +1,25 @@
+# PLACEHOLDER values: replace with specs pulled from ArduPilot sources
+# (frame parameter files, ardupilot_gazebo models) in the assets workstream.
+name: quad_iris_class
+vehicle_class: multicopter
+provenance: placeholder
+sensors:
+  - gps
+  - barometer
+  - magnetometer
+  - imu
+  - optical-flow
+  - forward-camera
+capabilities:
+  guided_takeoff: true
+  guided_goto: true
+  non_gps_nav: true
+  nav_mesh_planning: true
+  rtl: true
+  loiter: true
+  max_speed_ms: 12.0
+  flight_time_min: 22.0
+sitl_params:
+  FRAME_CLASS: 1
+  FRAME_TYPE: 1
+gazebo_model: iris

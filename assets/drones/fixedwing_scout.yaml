@@ -1,0 +1,23 @@
+# PLACEHOLDER values: replace with specs pulled from ArduPilot sources
+# in the assets workstream.
+name: fixedwing_scout
+vehicle_class: fixed-wing
+provenance: placeholder
+sensors:
+  - gps
+  - barometer
+  - magnetometer
+  - imu
+  - pitot
+  - gimbal-camera
+capabilities:
+  guided_takeoff: false
+  auto_mission: true
+  non_gps_nav: false
+  nav_mesh_planning: false
+  rtl: true
+  loiter: true
+  max_speed_ms: 22.0
+  flight_time_min: 60.0
+sitl_params: {}
+gazebo_model: zephyr

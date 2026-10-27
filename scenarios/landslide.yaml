@@ -1,0 +1,32 @@
+name: landslide
+kind: Landslide (slope debris)
+description: >-
+  Slope failure over a hillside road. Victims are buried or stranded along
+  the debris path; ground is unstable and the slide may extend. Hazard zones
+  mark the active slip face.
+grid:
+  width: 10
+  height: 12
+victims:
+  categories:
+    human:
+      min: 1
+      max: 3
+      mobility: static
+    child:
+      min: 0
+      max: 1
+      mobility: static
+    animal:
+      min: 1
+      max: 2
+      mobility: static
+hazards:
+  - {x: 5, y: 9, radius: 2.0, label: slip-face}
+weather:
+  - rain-heavy
+  - overcast
+difficulty:
+  visibility: low
+  victim_mobility: static
+  hazard_drift: true

@@ -1,0 +1,34 @@
+name: forest_fire
+kind: Forest fire (haze)
+description: >-
+  Wildfire with heavy smoke haze reducing visibility. Victims are scattered
+  hikers and trapped wildlife near the treeline. Hazard zones mark active
+  fire fronts that the drone must not enter.
+grid:
+  width: 10
+  height: 10
+victims:
+  categories:
+    human:
+      min: 2
+      max: 4
+      mobility: static
+    child:
+      min: 0
+      max: 1
+      mobility: static
+    animal:
+      min: 1
+      max: 3
+      mobility: static
+hazards:
+  - {x: 7, y: 7, radius: 2.0, label: fire-front}
+  - {x: 3, y: 8, radius: 1.5, label: fire-front}
+weather:
+  - haze-heavy
+  - haze-moderate
+  - clear
+difficulty:
+  visibility: low
+  victim_mobility: static
+  hazard_drift: false
