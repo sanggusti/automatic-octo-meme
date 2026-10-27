@@ -43,15 +43,17 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 | Sample seeds (v0) | `[1, 2, 3]` | per task |
 | Victim weights | child 3, human 2, animal 1 | `dmb/scorers/mission.py` |
 
-## Track 1 sim (target, owned by #2)
+## Track 1 sim (verified in #2)
 
 | Item | Spec |
 |---|---|
-| OS image | Ubuntu 22.04 (`infra/sim/Dockerfile`) |
-| Renderer/sim | Gazebo Harmonic (`gz-harmonic`) |
-| Plugin | `ArduPilot/ardupilot_gazebo` (main; pin a commit in #2) |
-| ArduPilot | source ref TBD in #2; `waf configure --board sitl`, `waf copter` |
-| Isolation | 1 SITL instance per worker via compose replicas |
+| OS image | Ubuntu 22.04 arm64 (`infra/sim/Dockerfile` → `dmb/sim:track1`) |
+| Renderer/sim | Gazebo Harmonic (`gz-harmonic` 8.x), headless server |
+| Plugin | `ArduPilot/ardupilot_gazebo` @ `80dc9664` |
+| ArduPilot | `Copter-4.6.3` (`92b0cd78`); `waf configure --board sitl`, `waf copter` |
+| Boot | `infra/sim/entrypoint.sh`: `gz sim -s` + `sim_vehicle.py --no-mavproxy -I0`; SITL TCP 5760 |
+| Isolation | 1 container (1 SITL + 1 Gazebo) per episode, random host port |
+| Grid mapping | 5 m/cell, east=+x, north=+y from GPS home anchor |
 
 ## Track 2 sim (target, owned by #6)
 
@@ -72,3 +74,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
   Baseten credits pending — provider runs blocked.
 - 2026-10-27: Modal re-login verified; vLLM server deployed, smoke + mission
   evals pass, deployment stopped. Baseten still pending.
+- 2026-10-27: Track 1 verified; scripted GUIDED flight + 2-parallel
+  isolation pass; forest_fire runs on gazebo-sitl. Pre-arm settling needs
+  ~1 min per fresh worker (bridge retries, reports vehicle reason).

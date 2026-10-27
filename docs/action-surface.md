@@ -4,9 +4,28 @@
 
 Flight semantics follow ArduPilot Copter in **GUIDED mode**: `mode guided`
 → `arm throttle` → `takeoff <alt>` → position/loiter commands → `land`/`RTL`,
-with missions and geofence available. The Track 1 backend speaks to real SITL
-over MAVLink; exact message bindings are pinned in the sim-spike workstream.
-Until then, `MockBridge` implements identical tool-level semantics on a grid.
+with missions and geofence available. `MockBridge` implements identical
+tool-level semantics on a grid; `GazeboSITLBridge` flies them for real.
+
+## MAVLink bindings (Track 1, verified against Copter-4.6.3 SITL)
+
+Link: pymavlink TCP to the worker's port 5760, heartbeat + requested
+`MAV_DATA_STREAM_ALL` telemetry. Grid cells map to metres around the GPS
+home anchor (east = +x, north = +y, 5 m/cell).
+
+| Tool | MAVLink | Notes |
+|---|---|---|
+| `arm` | `SET_MODE` GUIDED, then `MAV_CMD_COMPONENT_ARM_DISARM` | GUIDED first; arm polled via heartbeat flags |
+| `takeoff` | `MAV_CMD_NAV_TAKEOFF` (param7 = alt) | complete when `GLOBAL_POSITION_INT.relative_alt` ≥ target − 1 m |
+| `goto_location` | `SET_POSITION_TARGET_GLOBAL_INT`, `MAV_FRAME_GLOBAL_RELATIVE_ALT_INT`, position-only mask (3576) | re-sent at 1 Hz until within 1 cell; altitude holds current (≥ 3 m) |
+| `loiter` | (none — timed hold) | GUIDED holds position; waits ≤ 30 s |
+| `land` | `SET_MODE` LAND | complete when relative alt < 0.3 m |
+| `return_to_launch` | `SET_MODE` RTL | complete on disarm |
+| `get_telemetry` | `GLOBAL_POSITION_INT`, `SYS_STATUS`, `VFR_HUD`, `GPS_RAW_INT` | position → grid, battery %, alt |
+| `request_edge_report` | (none — truth-based stub in #2) | victims from scenario metadata; camera frames arrive with watcher T2 |
+
+Refusals (disarmed takeoff, grounded goto, rejected mode) return text, never
+raise; only infrastructure failures (container, link loss) raise.
 
 ## LM tools (`dmb/tools/drone.py`)
 
