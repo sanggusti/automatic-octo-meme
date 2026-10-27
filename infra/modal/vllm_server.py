@@ -14,11 +14,14 @@ import modal
 MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"  # swap for the custom model
 MODEL_REVISION: str | None = None  # pin a commit for reproducibility
 
+# Image pins follow Modal's verified vLLM OpenAI-compatible example: newer
+# vLLM (0.32) fails FlashInfer JIT (ninja error) on cuda:12.4, crashing
+# EngineCore before port 8000 binds.
 vllm_image = (
-    modal.Image.from_registry("nvidia/cuda:12.4.0-devel-ubuntu22.04", add_python="3.11")
+    modal.Image.from_registry("nvidia/cuda:12.9.0-devel-ubuntu22.04", add_python="3.12")
     .entrypoint([])
-    .uv_pip_install("vllm")
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
+    .uv_pip_install("vllm==0.21.0")
+    .env({"HF_XET_HIGH_PERFORMANCE": "1"})
 )
 
 hf_cache_vol = modal.Volume.from_name("dmb-huggingface-cache", create_if_missing=True)
@@ -49,6 +52,10 @@ def serve():
         "0.0.0.0",
         "--port",
         "8000",
+        # Required for OpenAI-style tool calling (Qwen emits Hermes format).
+        "--enable-auto-tool-choice",
+        "--tool-call-parser",
+        "hermes",
     ]
     if MODEL_REVISION:
         cmd += ["--revision", MODEL_REVISION]
