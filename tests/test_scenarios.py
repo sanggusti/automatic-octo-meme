@@ -8,6 +8,7 @@ def test_all_five_scenarios_load():
         "flood",
         "forest_fire",
         "landslide",
+        "tsunami",
     ]
     for name in list_scenarios():
         config = load_scenario(name)

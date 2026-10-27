@@ -21,3 +21,9 @@ Status as of 2026-10-27 in brackets.
 7. **Baseline sweep** (#7) — 2–3 Baseten models + 1 Modal custom model over the
    full scenario pack; first published results table. [blocked on #1, #4]
 8. **Results aggregation** (#8) — `runs/*/scores.json` → tables/plots script.
+9. **Tsunami scenario** (#15) — task wiring + phase dynamics + golden scores.
+10. **Scenario watcher** (#16) — L2 event log, T1 replay CLI, T2 backend
+    capture, T3 composite design.
+11. **Asset pack: vegetation + fire** (#17) — fuel grid, spread model, T1 flora.
+12. **Asset pack: terrain + water** (#18) — surge/slip dynamics, T1 water/terrain.
+13. **Asset pack: actors** (#19) — human/animal param schema + T1 figures.

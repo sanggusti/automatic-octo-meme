@@ -1,12 +1,13 @@
 # Scenarios
 
-Five disaster types under `scenarios/`, each a YAML with: grid size, victim
+Six disaster types under `scenarios/`, each a YAML with: grid size, victim
 categories (`human`/`child`/`animal` with count ranges and mobility),
 hazard zones, weather options, and difficulty knobs.
 
 | Scenario | Kind | Grid | Notes |
 |---|---|---|---|
 | `forest_fire` | Wildfire + haze | 10×10 | Low visibility; fire-front hazards |
+| `tsunami` | Coastal surge | 12×10 | Warning phases; surge + debris hazards |
 | `flash_flood` | Valley surge | 12×10 | Rising water; drifting hazards |
 | `flood` | Standing water | 14×10 | Large area; submerged power lines |
 | `earthquake` | Urban rubble | 10×10 | Trapped victims; unstable structures |
