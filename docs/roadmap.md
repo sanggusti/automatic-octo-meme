@@ -6,7 +6,8 @@ Status as of 2026-10-27 in brackets.
 1. **Inference spike** (#1) — first verified Baseten + Modal runs through the
    smoke and forest-fire tasks. [partial 2026-10-27: Modal verified, deployment
    stopped; Baseten still blocked on credits] Unblocks all real-model work.
-2. **Sim spike (Track 1)** (#2) — pinned image builds; SITL+Gazebo boots;
+2. **Sim spike (Track 1)** (#2) [done 2026-10-27: image, bridge, flight
+   proofs, 2-parallel isolation] — pinned image builds; SITL+Gazebo boots;
    scripted GUIDED takeoff/hover/land; MAVLink message set documented;
    `GazeboSITLBridge` implemented against the `SimBridge` contract.
 3. **Drone-spec assets** (#3) — replace placeholder specs with pulls from

@@ -30,6 +30,17 @@ Provider runs (keys required):
   --model openai-api/modal/<name> --limit 1
 ```
 
+SITL backend runs (Docker daemon required, outside any sandbox):
+
+```bash
+docker build -t dmb/sim:track1 infra/sim
+DMB_SIM_BACKEND=gazebo-sitl \
+XDG_DATA_HOME=$PWD/.inspect-data INSPECT_LOG_DIR=./logs \
+INSPECT_TRACE_FILE=./logs/trace.log \
+  .venv/bin/inspect eval evals/forest_fire.py --model mockllm/model --limit 1
+DMB_RUN_SITL_TESTS=1 .venv/bin/python -m pytest tests/test_sitl_integration.py -q
+```
+
 ## Troubleshooting
 
 | Symptom | Fix |

@@ -1,11 +1,11 @@
-# Track 1 sim topology. One `worker` replica per parallel eval sample gives
-# per-sample SITL isolation; scale replicas with inspect-ai concurrency.
+# Track 1 sim topology. One container per worker: the bridge spawns an
+# episode container with a random host port mapped to 5760 (SITL MAVLink).
+# Static multi-worker pools: docker compose up -d --scale worker=N
+# (each replica gets its own Gazebo+SITL pair; query ports per container).
 services:
-  sim:
+  worker:
     build: .
     image: dmb/sim:track1
     shm_size: 2gb
-    environment:
-      - DISPLAY=${DISPLAY:-}
-    # Headless software rendering by default; GPU passthrough is a later issue.
-    command: ["gz", "sim", "-v4", "-r", "-s", "shapes.sdf"]
+    ports:
+      - "5760"
