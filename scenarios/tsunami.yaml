@@ -23,8 +23,8 @@ victims:
       max: 2
       mobility: mobile
 hazards:
-  - {x: 6, y: 2, radius: 3.0, label: surge-channel}
-  - {x: 9, y: 6, radius: 1.5, label: debris-field}
+  - {x: 6, y: 2, radius: 3.0, label: surge-channel, active_from_phase: 1}
+  - {x: 9, y: 6, radius: 1.5, label: debris-field, active_from_phase: 2}
 weather:
   - overcast
   - storm
@@ -34,6 +34,6 @@ difficulty:
   victim_mobility: mixed
   hazard_drift: true
   phases:
-    - recede-warning
-    - wave-arrival
-    - debris
+    - {name: recede-warning, until_step: 20}
+    - {name: wave-arrival, until_step: 40}
+    - {name: debris, until_step: 60}

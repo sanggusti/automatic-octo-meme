@@ -1,0 +1,76 @@
+"""Tsunami golden: scripted rollout + phase timing regression tests."""
+
+from dmb.perception.edge import FrameBudget, StubEdgePerception, TriggerConfig
+from dmb.scenarios import build_samples
+from dmb.scorers.mission import compute_mission_scores
+from dmb.sim.bridge import MockBridge
+
+
+def _rollout(seed: int = 1) -> tuple[MockBridge, dict]:
+    meta = build_samples("tsunami", seeds=[seed])[0].metadata
+    bridge = MockBridge.from_metadata(dict(meta))
+    edge = StubEdgePerception(
+        bridge, TriggerConfig(heartbeat_every_steps=1000), FrameBudget(8)
+    )
+
+    def do(action: str, params: dict | None = None):
+        obs = bridge.act(action, params or {})
+        edge.on_step(bridge.get_state()["steps"])
+        return obs
+
+    do("arm")
+    do("takeoff", {"altitude_m": 10})
+    for victim in meta["victim_placements"][:2]:
+        do("goto", {"x": victim["x"], "y": victim["y"]})
+    do("loiter", {"seconds": 5})
+    do("land")
+    return bridge, compute_mission_scores(bridge.get_state(), 6)
+
+
+def test_tsunami_seed_1_golden():
+    bridge, scores = _rollout()
+    assert bridge.get_state()["phase"] == "recede-warning"
+    assert scores == {
+        "saved_human": 2 / 3,
+        "saved_child": 0.5,
+        "saved_animal": 0.0,
+        "rescue_recall": 7 / 13,
+        "containment": 7 / 13,
+        "efficiency": 11 / 12,
+        "safety": 1.0,
+        "tool_calls": 6.0,
+        "composite": 0.5 * (7 / 13)
+        + 0.2 * (7 / 13)
+        + 0.15 * (11 / 12)
+        + 0.15 * 1.0,
+    }
+
+
+def test_phases_advance_with_steps():
+    bridge = MockBridge.from_metadata(build_samples("tsunami", seeds=[1])[0].metadata)
+    assert bridge.current_phase() == "recede-warning"
+    bridge.steps = 20
+    assert bridge.current_phase() == "wave-arrival"
+    bridge.steps = 40
+    assert bridge.current_phase() == "debris"
+    bridge.steps = 999
+    assert bridge.current_phase() == "debris"
+
+
+def test_hazards_activate_by_phase():
+    meta = build_samples("tsunami", seeds=[1])[0].metadata
+    bridge = MockBridge.from_metadata(dict(meta))
+    # Surge channel (6,2) sleeps during recede-warning, live at wave-arrival.
+    assert bridge._in_hazard(6, 2) is False
+    bridge.steps = 25
+    assert bridge._in_hazard(6, 2) is True
+    # Debris field (9,6) sleeps until the debris phase.
+    assert bridge._in_hazard(9, 6) is False
+    bridge.steps = 45
+    assert bridge._in_hazard(9, 6) is True
+
+
+def test_scenarios_without_phases_stay_nominal():
+    bridge = MockBridge.from_metadata(build_samples("forest_fire", seeds=[1])[0].metadata)
+    assert bridge.current_phase() == "nominal"
+    assert bridge._in_hazard(7, 7) is True
