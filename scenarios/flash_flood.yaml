@@ -32,3 +32,10 @@ difficulty:
   visibility: medium
   victim_mobility: static
   hazard_drift: true
+dynamics:
+  water:
+    origin: south
+    rate_num: 1
+    rate_den: 3
+    current: [0, -1]
+    drift_every: 3

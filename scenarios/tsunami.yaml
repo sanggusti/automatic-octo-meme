@@ -37,3 +37,10 @@ difficulty:
     - {name: recede-warning, until_step: 20}
     - {name: wave-arrival, until_step: 40}
     - {name: debris, until_step: 60}
+dynamics:
+  water:
+    origin: south
+    rate_num: 1
+    rate_den: 4
+    current: [0, -1]
+    drift_every: 3

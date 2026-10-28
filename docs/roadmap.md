@@ -31,8 +31,9 @@ Status as of 2026-10-27 in brackets.
 14. **Frontier A: eval rigor** (#25) [done 2026-10-27: difficulty bands,
     intermediate metrics, 3 human baselines, 100-seed CI] — difficulty,
     intermediate metrics, human baselines, 100+ seeds, heuristic agents.
-15. **Frontier B: physics accuracy** (#26) — validated fire/water/terrain
-    dynamics, per-disaster containment.
+15. **Frontier B: physics accuracy** (#26) [done 2026-10-28: T0 fire/water/
+    slip models, beat-spread containment, snapshot suite] — validated
+    fire/water/terrain dynamics, per-disaster containment.
 16. **Frontier C: perception + fidelity** (#27) — camera frames, edge VLM,
     UE GIS terrain.
 17. **Frontier D: data flywheel** (#28) — trajectory export, finetune,

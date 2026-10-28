@@ -129,6 +129,7 @@ def build_samples(
                     "hazards": config.hazards,
                     "weather": config.weather,
                     "difficulty": config.difficulty,
+                    "dynamics": config.raw.get("dynamics", {}),
                     "difficulty_score": difficulty_score(
                         {
                             "grid": config.grid,

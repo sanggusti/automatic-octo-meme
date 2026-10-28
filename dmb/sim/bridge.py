@@ -34,6 +34,7 @@ class Victim:
     mobility: str = "static"
     found: bool = False
     rescued: bool = False
+    found_step: int = -1
 
 
 @dataclass
@@ -104,6 +105,7 @@ class MockBridge(SimBridge):
         self._announced_phase = None
         self._visited = {(0, 0)}
         self.first_find_step = None
+        self._init_dynamics(metadata.get("dynamics", {}))
         return self._observe("Episode start. Drone on pad at (0, 0), disarmed.")
 
     # -- primitives -----------------------------------------------------
@@ -111,6 +113,37 @@ class MockBridge(SimBridge):
         self.steps += 1
         if self.drone.airborne:
             self.drone.battery_pct = max(0.0, self.drone.battery_pct - self.battery_drain)
+        self._step_dynamics()
+
+    def _init_dynamics(self, config: dict) -> None:
+        from dmb.physics.fire import FireModel  # noqa: PLC0415
+        from dmb.physics.terrain import SlipModel  # noqa: PLC0415
+        from dmb.physics.water import WaterModel  # noqa: PLC0415
+
+        self._fire = FireModel(config["fire"], self.width, self.height) if "fire" in config else None
+        self._water = WaterModel(config["water"], self.width, self.height) if "water" in config else None
+        self._slip = SlipModel(config["terrain"], self.width, self.height) if "terrain" in config else None
+        self._danger: dict[tuple[int, int], int] = {}
+        if self._fire is not None:
+            self._danger.update(self._fire.danger_steps())
+        if self._water is not None:
+            self._danger.update(self._water.danger_steps())
+
+    def _step_dynamics(self) -> None:
+        if self._fire is not None:
+            self._fire.step(self.steps)
+            self._danger.update(self._fire.danger_steps())
+        if self._water is not None:
+            self._water.step(self.steps)
+            for victim in self.victims:
+                self._water.drift(victim, self.steps)
+        if self._slip is not None:
+            debris = self._slip.step(self.steps)
+            for cell in debris:
+                self._danger.setdefault(cell, self.steps)
+            for victim in self.victims:
+                if (victim.x, victim.y) in self._slip.debris_cells:
+                    victim.mobility = "buried"
 
     def current_phase_index(self) -> int:
         """Index into self.phases by step count; 0 when no phases defined."""
@@ -125,6 +158,9 @@ class MockBridge(SimBridge):
         return str(self.phases[self.current_phase_index()].get("name", "nominal"))
 
     def _in_hazard(self, x: int, y: int) -> bool:
+        danger_step = self._danger.get((x, y))
+        if danger_step is not None and danger_step <= self.steps:
+            return True
         phase_idx = self.current_phase_index()
         for hz in self.hazards:
             if int(hz.get("active_from_phase", 0)) > phase_idx:
@@ -204,6 +240,8 @@ class MockBridge(SimBridge):
 
     def mark_found(self, victim: Victim) -> None:
         victim.found = True
+        if victim.found_step < 0:
+            victim.found_step = self.steps
         if self.first_find_step is None:
             self.first_find_step = self.steps
 
@@ -249,12 +287,15 @@ class MockBridge(SimBridge):
                     "category": v.category,
                     "x": v.x,
                     "y": v.y,
+                    "mobility": v.mobility,
                     "found": v.found,
                     "rescued": v.rescued,
+                    "found_step": v.found_step,
                 }
                 for v in self.victims
             ],
             "hazards": self.hazards,
+            "cell_danger": {f"{x},{y}": s for (x, y), s in self._danger.items()},
         }
 
     def close(self) -> None:

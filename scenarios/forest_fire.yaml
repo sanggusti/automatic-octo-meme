@@ -31,4 +31,14 @@ weather:
 difficulty:
   visibility: low
   victim_mobility: static
-  hazard_drift: false
+  hazard_drift: true
+dynamics:
+  fire:
+    ignition: [{x: 7, y: 7}, {x: 3, y: 8}]
+    moisture: 0.3
+    wind_dir: [1, 0]
+    wind_speed: 3.0
+    fuel_default: 0.7
+    burn_duration: 25
+    ignition_threshold: 1.0
+    base_ros: 0.06

@@ -37,9 +37,23 @@ def compute_mission_scores(final_state: dict, tool_calls: int) -> dict[str, floa
     violations = int(final_state.get("safety_violations", 0))
     safety = 1.0 if violations == 0 else max(0.0, 1.0 - 0.25 * violations)
 
-    # Damage containment proxy v0: coverage of the incident area without
-    # violations. Refined per scenario once hazard dynamics exist.
-    containment = max(0.0, min(1.0, rescue_recall * safety))
+    # Damage containment: weighted fraction of victims found BEFORE their
+    # cell became dangerous (beat-the-spread), times safety. Without
+    # dynamics every danger step is infinite, reducing to recall * safety.
+    cell_danger = final_state.get("cell_danger", {})
+    beaten_weight = 0.0
+    for v in victims:
+        if not v.get("found"):
+            continue
+        found_step = v.get("found_step", -1)
+        if found_step < 0:
+            beaten_weight += VICTIM_WEIGHTS.get(v.get("category", ""), 0.0)
+            continue
+        danger = cell_danger.get(f"{v.get('x')},{v.get('y')}", float("inf"))
+        if found_step <= danger:
+            beaten_weight += VICTIM_WEIGHTS.get(v.get("category", ""), 0.0)
+    beat = (beaten_weight / total_weight) if total_weight else 1.0
+    containment = max(0.0, min(1.0, beat * safety))
 
     composite = 0.5 * rescue_recall + 0.2 * containment + 0.15 * efficiency + 0.15 * safety
     return {

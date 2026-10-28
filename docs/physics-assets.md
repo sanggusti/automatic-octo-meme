@@ -1,5 +1,9 @@
 # Physics Assets — Convincing Worlds for Decision Benchmarks
 
+Status: T0 dynamics implemented in `dmb/physics/` (#26) — FBP-inspired cell
+fire spread, surge-front water with drift, saturation-triggered slip with
+debris burial. T1 plugins and T2 dressing remain in #17/#18.
+
 Principle: physics must be **convincing where decisions depend on it** and
 honestly simple elsewhere. A fire model that spreads wrong teaches the
 benchmark to reward wrong plans; a tree that is only a billboard is fine if
