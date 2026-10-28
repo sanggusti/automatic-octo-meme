@@ -28,3 +28,12 @@ def test_distinct_seeds_differ():
     a = build_samples("forest_fire", seeds=[1])[0].metadata["world_hash"]
     b = build_samples("forest_fire", seeds=[2])[0].metadata["world_hash"]
     assert a != b
+
+
+def test_brief_states_grid_bounds():
+    from dmb.scenarios import build_samples
+
+    sample = build_samples("forest_fire", seeds=[1])[0]
+    assert "10x10" in sample.input
+    assert "x=0..9, y=0..9" in sample.input
+    assert "(0, 0)" in sample.input

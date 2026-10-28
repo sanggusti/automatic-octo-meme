@@ -10,6 +10,8 @@ from __future__ import annotations
 from inspect_ai.scorer import Score, Scorer, Target, mean, scorer
 from inspect_ai.solver import TaskState
 
+from dmb.watch import record_score
+
 # Rescue priority weights. Children first, then humans, then animals.
 VICTIM_WEIGHTS = {"child": 3.0, "human": 2.0, "animal": 1.0}
 
@@ -89,6 +91,7 @@ def mission_score() -> Scorer:
                 explanation="No sim state recorded; solver did not run the mission.",
             )
         breakdown = compute_mission_scores(sim_state, _count_tool_calls(state))
+        record_score(str(state.sample_id), breakdown)
         return Score(
             value=breakdown["composite"],
             answer=str(breakdown),

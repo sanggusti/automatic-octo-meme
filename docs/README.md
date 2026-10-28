@@ -18,6 +18,7 @@ advisors** in simulated 3D disaster environments.
 | [inference](inference.md) | Baseten + Modal model routing through inspect-ai |
 | [tracking](tracking.md) | Run registry, eval logs, reproducibility contract |
 | [track2-runbook](track2-runbook.md) | Colosseum workstation setup + verdict repro |
+| [flywheel](flywheel.md) | Phase D data loop: export, finetune, delta, artifacts |
 | [human-evals](human-evals.md) | Operator-in-the-loop baselines and grading |
 | [assets](assets.md) | Drone specification assets pipeline |
 | [runbooks](runbooks.md) | Setup, daily commands, troubleshooting |

@@ -81,6 +81,7 @@ class MockBridge(SimBridge):
         self.width = 10
         self.height = 10
         self.steps = 0
+        self.sim_time = 0.0
         self.safety_violations = 0
         self.seed = 0
         self.scenario = "mock"
@@ -105,6 +106,7 @@ class MockBridge(SimBridge):
         self.phases = list(metadata.get("difficulty", {}).get("phases", []))
         self.drone = DroneState(battery_pct=100.0)
         self.steps = 0
+        self.sim_time = 0.0
         self.safety_violations = 0
         self._announced_phase = None
         self._visited = {(0, 0)}
@@ -115,6 +117,9 @@ class MockBridge(SimBridge):
     # -- primitives -----------------------------------------------------
     def _tick(self) -> None:
         self.steps += 1
+        # Nominal 5 sim-seconds per action on the mock backend; SITL maps
+        # wall time. Watcher `t` fields use this clock.
+        self.sim_time += 5.0
         if self.drone.airborne:
             self.drone.battery_pct = max(0.0, self.drone.battery_pct - self.battery_drain)
         self._step_dynamics()
@@ -290,6 +295,7 @@ class MockBridge(SimBridge):
             "scenario": self.scenario,
             "seed": self.seed,
             "steps": self.steps,
+            "sim_time": self.sim_time,
             "step_budget": self.step_budget,
             "phase": self.current_phase(),
             "safety_violations": self.safety_violations,

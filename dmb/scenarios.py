@@ -112,10 +112,15 @@ def build_samples(
     for seed in seeds:
         rng = random.Random(seed)
         placements = _place_victims(rng, config)
+        grid = config.grid
+        width, height = int(grid.get("width", 10)), int(grid.get("height", 10))
         brief = mission_brief or (
             f"You are the drone navigator for a {config.kind} disaster response "
-            f"mission ({config.name}). {config.description} Locate victims and "
-            "report their positions. Minimise flight time and avoid hazard zones."
+            f"mission ({config.name}). {config.description} The search grid is "
+            f"{width}x{height} cells with integer coordinates "
+            f"x=0..{width - 1}, y=0..{height - 1}; the drone starts at (0, 0). "
+            "Locate victims and report their positions. Minimise flight "
+            "time and avoid hazard zones."
         )
         samples.append(
             Sample(

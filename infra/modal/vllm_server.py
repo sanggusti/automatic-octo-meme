@@ -11,7 +11,14 @@ workspace. See docs/inference.md.
 
 import modal
 
-MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"  # swap for the custom model
+# Default teacher. VL attempt 2026-10-28: Qwen2.5-VL-7B-Instruct on A10G
+# (16k ctx, mm-limit 8) serves but will not emit Hermes tool calls
+# (outputs pseudo-calls like arm_drone_motors() as text; forced
+# tool_choice works). Flywheel v1 is text-policy: the LM navigates on
+# edge REPORTS, DMB_VISION=text. Serve a finetune via
+# infra/modal/vllm_flywheel.py (same factory, merged-weights path).
+MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
+APP_NAME = "dmb-vllm-openai-compatible"
 MODEL_REVISION: str | None = None  # pin a commit for reproducibility
 
 # Image pins follow Modal's verified vLLM OpenAI-compatible example: newer
@@ -26,8 +33,12 @@ vllm_image = (
 
 hf_cache_vol = modal.Volume.from_name("dmb-huggingface-cache", create_if_missing=True)
 vllm_cache_vol = modal.Volume.from_name("dmb-vllm-cache", create_if_missing=True)
+models_vol = modal.Volume.from_name("dmb-flywheel-models", create_if_missing=True)
 
-app = modal.App("dmb-vllm-openai-compatible")
+# NOTE: keep serve() at module level — Modal cannot deploy functions
+# defined inside a factory (LocalFunctionError). The finetune twin
+# (vllm_flywheel.py) duplicates this block with a different model path.
+app = modal.App(APP_NAME)
 
 
 @app.function(
@@ -36,6 +47,7 @@ app = modal.App("dmb-vllm-openai-compatible")
     volumes={
         "/root/.cache/huggingface": hf_cache_vol,
         "/root/.cache/vllm": vllm_cache_vol,
+        "/models": models_vol,
     },
     timeout=3600,
 )
@@ -56,6 +68,14 @@ def serve():
         "--enable-auto-tool-choice",
         "--tool-call-parser",
         "hermes",
+        # A10G fit: encoder + graphs OOM at 32k; episodes are short.
+        "--max-model-len",
+        "16384",
+        "--gpu-memory-utilization",
+        "0.90",
+        # Episodes accumulate up to snapshot-budget frames in one prompt.
+        "--limit-mm-per-prompt",
+        '{"image": 8}',
     ]
     if MODEL_REVISION:
         cmd += ["--revision", MODEL_REVISION]

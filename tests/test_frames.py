@@ -88,3 +88,15 @@ def test_edge_report_message_multimodal():
     assert isinstance(multi[1], ContentImage)
     assert multi[1].image.startswith("data:image/png;base64,")
     assert multi[1].detail == "low"
+
+
+def test_edge_report_message_text_mode(monkeypatch):
+    from dmb.tools.drone import edge_report_message
+
+    monkeypatch.setenv("DMB_VISION", "text")
+    report = EdgeReport(trigger="requested", step=1, summary="scan", frame_ref="f1")
+    bridge = _state()
+    png = bridge.capture_frame("t6")
+    assert png is not None
+    out = edge_report_message(report, png)
+    assert isinstance(out, str) and "text-only run" in out
