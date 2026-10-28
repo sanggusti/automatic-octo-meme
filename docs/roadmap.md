@@ -34,8 +34,9 @@ Status as of 2026-10-27 in brackets.
 15. **Frontier B: physics accuracy** (#26) [done 2026-10-28: T0 fire/water/
     slip models, beat-spread containment, snapshot suite] — validated
     fire/water/terrain dynamics, per-disaster containment.
-16. **Frontier C: perception + fidelity** (#27) — camera frames, edge VLM,
-    UE GIS terrain.
+16. **Frontier C: perception + fidelity** (#27) [done 2026-10-28: native
+    SITL frames, vision tools, edge-VLM baseline, Colosseum bridge +
+    verdict harness] — camera frames, edge VLM, UE GIS terrain.
 17. **Frontier D: data flywheel** (#28) — trajectory export, finetune,
     held-out delta.
 18. **Frontier E: release bar** (#29) — 600+ tasks, full baselines,

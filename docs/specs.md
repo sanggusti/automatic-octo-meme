@@ -55,12 +55,15 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 | Isolation | 1 container (1 SITL + 1 Gazebo) per episode, random host port |
 | Grid mapping | 5 m/cell, east=+x, north=+y from GPS home anchor |
 
-## Track 2 sim (target, owned by #6)
+## Track 2 sim (code done in #27; live run owned by #6)
 
 | Item | Spec |
 |---|---|
 | Engine/sim | Colosseum (`CodexLabsLLC/Colosseum`, AirSim successor) on Unreal |
+| Versions | UE 5.6 (main branch), Windows 10; Ubuntu 22.04 Vulkan caveat |
 | Workstation | Operator PC, RTX 5070 Ti 16 GB VRAM |
+| Client API | msgpack-rpc 127.0.0.1:41451; takeoff/land/goHome/moveToPosition/hover/simGetImages verified in client source |
+| Grid mapping | Local NED metres around spawn (east=+x, north=+y), 5 m/cell |
 | Isolation | 1 session per sample |
 
 ## Drone specs (owned by #3)
@@ -82,3 +85,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
   baselines recorded (0.30/0.37/0.63).
 - 2026-10-28: Phase B done; T0 fire/water/slip dynamics with snapshot
   suite; containment is beat-the-spread; suite 31 green.
+- 2026-10-28: Phase C done; native SITL frames + vision tool results,
+  edge-VLM baseline (stub-tested), Colosseum bridge (fake-tested) +
+  verdict harness (mock-vs-SITL match live); suite 44 green.

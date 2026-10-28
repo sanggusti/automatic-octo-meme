@@ -7,10 +7,23 @@ annotations are required by inspect-ai so the model knows how to call them.
 
 from __future__ import annotations
 
-from inspect_ai.tool import Tool, tool
+from inspect_ai.tool import ContentImage, ContentText, Tool, tool
 
 from dmb.perception.edge import EdgePerception
+from dmb.perception.frames import to_data_url
 from dmb.sim.bridge import SimBridge
+
+
+def edge_report_message(report, image: bytes | None) -> str | list:
+    """Text-only or multimodal (text + frame) tool result."""
+    detections = ", ".join(f"{d.label}@({d.x},{d.y})" for d in report.detections)
+    text = f"{report.summary} Detections: [{detections}]"
+    if image is None:
+        return text + (" [frame unavailable]" if report.frame_ref else "")
+    return [
+        ContentText(text=text),
+        ContentImage(image=to_data_url(image), detail="low"),
+    ]
 
 
 def _with_edge_report(obs_text: str, bridge: SimBridge, edge: EdgePerception) -> str:
@@ -130,17 +143,16 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
 
     @tool
     def request_edge_report():
-        async def execute() -> str:
+        async def execute():
             """Request an on-demand edge perception scan (uses snapshot budget).
 
             Returns:
-                Edge report with detections and snapshot status.
+                Edge report with detections, snapshot status, and — while
+                budget remains — the observation frame image.
             """
             report = edge.on_demand(int(bridge.get_state().get("steps", 0)))
-            detections = ", ".join(
-                f"{d.label}@({d.x},{d.y})" for d in report.detections
-            )
-            return f"{report.summary} Detections: [{detections}]"
+            image = bridge.capture_frame(report.frame_ref) if report.frame_ref else None
+            return edge_report_message(report, image)
 
         return execute
 

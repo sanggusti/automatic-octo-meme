@@ -63,6 +63,10 @@ class SimBridge(ABC):
     def close(self) -> None:
         """Release backend resources (sim instance, connections)."""
 
+    def capture_frame(self, ref: str) -> bytes | None:
+        """PNG bytes for an observation frame, or None if unavailable."""
+        return None
+
 
 class MockBridge(SimBridge):
     """Deterministic grid world. No external dependencies."""
@@ -263,6 +267,23 @@ class MockBridge(SimBridge):
         }
         return Observation(text=event, telemetry=telemetry)
 
+    def _danger_kind(self) -> str:
+        if getattr(self, "_fire", None) is not None:
+            return "fire"
+        if getattr(self, "_water", None) is not None:
+            return "water"
+        if getattr(self, "_slip", None) is not None:
+            return "terrain"
+        return "fire"
+
+    def capture_frame(self, ref: str) -> bytes | None:
+        """PNG bytes for an observation frame, or None if unavailable."""
+        from dmb.perception.frames import render_map_frame  # noqa: PLC0415
+
+        state = self.get_state()
+        state["danger_kind"] = self._danger_kind()
+        return render_map_frame(state, {"width": self.width, "height": self.height})
+
     def get_state(self) -> dict:
         cells = max(1, self.width * self.height)
         return {
@@ -392,12 +413,31 @@ class GazeboSITLBridge(MockBridge):
     def container_id(self) -> str | None:
         return self._container_id
 
+    def capture_frame(self, ref: str) -> bytes | None:
+        """Native camera frame with telemetry overlay; rendered fallback."""
+        from dmb.perception.frames import GazeboFrameCapture, overlay_telemetry  # noqa: PLC0415
+
+        if self._container_id is not None and getattr(self, "_partition", None):
+            grab = GazeboFrameCapture(self._container_id, self._partition)
+            png = grab.capture(ref)
+            if png is not None:
+                state = self.get_state()
+                drone = state["drone"]
+                return overlay_telemetry(
+                    png,
+                    [
+                        f"{state['scenario']} step={state['steps']} phase={state['phase']}",
+                        f"pos=({drone['x']},{drone['y']}) alt={drone['altitude_m']}m batt={drone['battery_pct']}%",
+                    ],
+                )
+        return super().capture_frame(ref)
+
     def _start_worker(self) -> None:
         # Unique transport partition: parallel workers must never merge
         # into one Gazebo discovery domain.
-        partition = f"dmb-{uuid.uuid4().hex[:12]}"
+        self._partition = f"dmb-{uuid.uuid4().hex[:12]}"
         proc = subprocess.run(
-            ["docker", "run", "-d", "--rm", "-e", f"GZ_PARTITION={partition}",
+            ["docker", "run", "-d", "--rm", "-e", f"GZ_PARTITION={self._partition}",
              "-p", "127.0.0.1::5760", self.image],
             capture_output=True, text=True, timeout=120,
         )

@@ -23,6 +23,20 @@ and keeps LM scores about decisions, not detector quality.
 - `DMB_EDGE_MAX_SNAPSHOTS_PER_EPISODE` (default 8): on-demand frames per
   episode. Exhaustion degrades to report-only, never fails the episode.
 
+## Vision channel (#27)
+
+- `request_edge_report` returns text + the observation frame image
+  (`ContentImage`, detail low) while budget remains; frames persist in the
+  inspect-ai eval log.
+- Mock renders truth-annotated top-down maps; SITL serves native 640×480
+  camera frames with telemetry overlay (rendered fallback if capture
+  fails). Frames show only observable content: visible dynamics, found
+  victims, drone pose — never unfound victims or invisible zones.
+- `VLMEdgePerception` (`dmb/perception/vlm.py`) is the detector baseline:
+  same triggers/budget, detections from a VLM over sensor-view frames
+  (`DMB_VLM_BASE_URL` / `DMB_VLM_API_KEY` / `DMB_VLM_MODEL`). Native-pixel
+  VLM input is later work (needs camera grounding).
+
 ## Implementation
 
 - `dmb/perception/edge.py`: `EdgePerception` ABC, `TriggerConfig`,
