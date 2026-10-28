@@ -41,6 +41,19 @@ INSPECT_TRACE_FILE=./logs/trace.log \
 DMB_RUN_SITL_TESTS=1 .venv/bin/python -m pytest tests/test_sitl_integration.py -q
 ```
 
+Baselines (provider-free, deterministic):
+
+```bash
+.venv/bin/python -m pytest tests/test_baselines.py -q
+.venv/bin/inspect eval evals/baselines.py --model mockllm/model
+```
+
+Human baseline mission (blind; scored + recorded like any run):
+
+```bash
+.venv/bin/python -m dmb.human_cli --scenario forest_fire --seed 1 --name <you>
+```
+
 ## Troubleshooting
 
 | Symptom | Fix |

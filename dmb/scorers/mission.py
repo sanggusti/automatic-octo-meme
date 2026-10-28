@@ -49,6 +49,9 @@ def compute_mission_scores(final_state: dict, tool_calls: int) -> dict[str, floa
         "efficiency": efficiency,
         "safety": safety,
         "tool_calls": float(tool_calls),
+        "found_any": 1.0 if any(v.get("found") for v in victims) else 0.0,
+        "first_find_step": float(final_state.get("first_find_step", -1)),
+        "coverage": float(final_state.get("coverage", 0.0)),
         "composite": composite,
     }
 

@@ -15,6 +15,8 @@ from pathlib import Path
 import yaml
 from inspect_ai.dataset import Sample
 
+from dmb.difficulty import difficulty_score
+
 SCENARIOS_DIR = Path(__file__).resolve().parent.parent / "scenarios"
 
 REQUIRED_KEYS = (
@@ -127,6 +129,14 @@ def build_samples(
                     "hazards": config.hazards,
                     "weather": config.weather,
                     "difficulty": config.difficulty,
+                    "difficulty_score": difficulty_score(
+                        {
+                            "grid": config.grid,
+                            "victim_placements": placements,
+                            "hazards": config.hazards,
+                            "difficulty": config.difficulty,
+                        }
+                    ),
                     "world_hash": world_hash(scenario, seed, placements),
                 },
             )

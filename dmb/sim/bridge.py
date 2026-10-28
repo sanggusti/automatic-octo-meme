@@ -80,6 +80,8 @@ class MockBridge(SimBridge):
         self.seed = 0
         self.scenario = "mock"
         self._announced_phase: str | None = None
+        self._visited: set[tuple[int, int]] = set()
+        self.first_find_step: int | None = None
 
     @classmethod
     def from_metadata(cls, metadata: dict, **kwargs: object) -> "MockBridge":
@@ -100,6 +102,8 @@ class MockBridge(SimBridge):
         self.steps = 0
         self.safety_violations = 0
         self._announced_phase = None
+        self._visited = {(0, 0)}
+        self.first_find_step = None
         return self._observe("Episode start. Drone on pad at (0, 0), disarmed.")
 
     # -- primitives -----------------------------------------------------
@@ -149,6 +153,7 @@ class MockBridge(SimBridge):
             return self._observe("Refused: not airborne.")
         self.drone.x = max(0, min(self.width - 1, x))
         self.drone.y = max(0, min(self.height - 1, y))
+        self._visited.add((self.drone.x, self.drone.y))
         self._tick()
         if self._in_hazard(self.drone.x, self.drone.y):
             self.safety_violations += 1
@@ -199,6 +204,8 @@ class MockBridge(SimBridge):
 
     def mark_found(self, victim: Victim) -> None:
         victim.found = True
+        if self.first_find_step is None:
+            self.first_find_step = self.steps
 
     def _observe(self, event: str) -> Observation:
         phase = self.current_phase()
@@ -219,6 +226,7 @@ class MockBridge(SimBridge):
         return Observation(text=event, telemetry=telemetry)
 
     def get_state(self) -> dict:
+        cells = max(1, self.width * self.height)
         return {
             "scenario": self.scenario,
             "seed": self.seed,
@@ -226,6 +234,8 @@ class MockBridge(SimBridge):
             "step_budget": self.step_budget,
             "phase": self.current_phase(),
             "safety_violations": self.safety_violations,
+            "coverage": len(self._visited) / cells,
+            "first_find_step": self.first_find_step if self.first_find_step is not None else -1,
             "drone": {
                 "x": self.drone.x,
                 "y": self.drone.y,
@@ -470,6 +480,7 @@ class GazeboSITLBridge(MockBridge):
         if pos is not None and self._home is not None:
             gx, gy = self._latlon_to_grid(pos.lat / 1e7, pos.lon / 1e7)
             self.drone.x, self.drone.y = gx, gy
+            self._visited.add((gx, gy))
             self.drone.altitude_m = pos.relative_alt / 1000.0
         status = self._recv("SYS_STATUS", timeout=5)
         if status is not None:
