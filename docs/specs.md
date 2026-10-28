@@ -77,3 +77,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-27: Track 1 verified; scripted GUIDED flight + 2-parallel
   isolation pass; forest_fire runs on gazebo-sitl. Pre-arm settling needs
   ~1 min per fresh worker (bridge retries, reports vehicle reason).
+- 2026-10-27: Phase A done; difficulty bands + first-find/coverage
+  metrics live; greedy 0.78 vs random 0.65 over 100 seeds; 3 human
+  baselines recorded (0.30/0.37/0.63).

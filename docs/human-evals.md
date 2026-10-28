@@ -13,7 +13,9 @@ every model row is compared against.
 Protocol:
 
 1. Check out the pinned task commit; record it in the run notes.
-2. Run the mission blind (no prior look at victim placements).
+2. Run the mission blind (no prior look at victim placements) via
+   `.venv/bin/python -m dmb.human_cli --scenario <s> --seed <n> --name <you>`.
+   The CLI never reveals placements.
 3. Transcript + scores land in the registry like any other run, tagged
    `baseline:human:<name>`.
 

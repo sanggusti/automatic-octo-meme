@@ -12,6 +12,9 @@ Computed deterministically from final sim state + transcript stats:
 | `efficiency` | `1 − steps/step_budget`, floored at 0 |
 | `safety` | 1.0 with no violations, −0.25 per violation, floored at 0 |
 | `tool_calls` | Transcript tool-call count (cost proxy) |
+| `found_any` | 1.0 if ≥1 victim found, else 0.0 (mean = first-find rate) |
+| `first_find_step` | Episode step of first find (−1 if none) |
+| `coverage` | Unique cells visited / total cells |
 | `composite` | `0.5·recall + 0.2·containment + 0.15·efficiency + 0.15·safety` |
 
 The inspect-ai scorer returns `composite` as the value with the full vector
@@ -28,6 +31,15 @@ dimension.
 - `containment` is a placeholder proxy until hazard dynamics exist; the
   scenario-pack workstream replaces it with per-disaster containment models
   (fire perimeter, water coverage, rubble cleared).
+
+## Difficulty scoring (`dmb/difficulty.py`)
+
+Every sample carries `difficulty_score: {score 0..1, band}` computed
+deterministically from victim count, mean distance from origin, hazard
+coverage, visibility, and mobility mix. Bands (easy < 0.55 < medium < 0.65
+< hard) are calibrated on seeds 1..100 across scenarios. Validation: a
+fixed-effort probe scores easy > medium > hard
+(`tests/test_baselines.py`).
 
 ## Metric roadmap
 

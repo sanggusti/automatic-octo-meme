@@ -28,8 +28,9 @@ Status as of 2026-10-27 in brackets.
 11. **Asset pack: vegetation + fire** (#17) — fuel grid, spread model, T1 flora.
 12. **Asset pack: terrain + water** (#18) — surge/slip dynamics, T1 water/terrain.
 13. **Asset pack: actors** (#19) — human/animal param schema + T1 figures.
-14. **Frontier A: eval rigor** (#25) — difficulty, intermediate metrics,
-    human baselines, 100+ seeds, heuristic agents.
+14. **Frontier A: eval rigor** (#25) [done 2026-10-27: difficulty bands,
+    intermediate metrics, 3 human baselines, 100-seed CI] — difficulty,
+    intermediate metrics, human baselines, 100+ seeds, heuristic agents.
 15. **Frontier B: physics accuracy** (#26) — validated fire/water/terrain
     dynamics, per-disaster containment.
 16. **Frontier C: perception + fidelity** (#27) — camera frames, edge VLM,

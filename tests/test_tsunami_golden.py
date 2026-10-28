@@ -39,6 +39,9 @@ def test_tsunami_seed_1_golden():
         "efficiency": 11 / 12,
         "safety": 1.0,
         "tool_calls": 6.0,
+        "found_any": 1.0,
+        "first_find_step": 2.0,
+        "coverage": 3 / 120,
         "composite": 0.5 * (7 / 13)
         + 0.2 * (7 / 13)
         + 0.15 * (11 / 12)
