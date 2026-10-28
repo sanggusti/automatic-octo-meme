@@ -14,6 +14,7 @@ from dmb.config import Settings
 from dmb.perception.edge import FrameBudget, StubEdgePerception, TriggerConfig
 from dmb.sim.bridge import GazeboSITLBridge, MockBridge
 from dmb.tools.drone import make_drone_tools
+from dmb.watch import watcher_from_env
 
 
 def _bridge_for_backend(backend: str):
@@ -34,10 +35,16 @@ def drone_mission() -> Solver:
             TriggerConfig(),
             FrameBudget(max_snapshots=8),
         )
-        tools: list[Tool] = make_drone_tools(bridge, edge)
+        watcher = watcher_from_env(str(state.sample_id))
+        watcher.on_start({**dict(state.metadata), "backend": backend})
+        tools: list[Tool] = make_drone_tools(bridge, edge, watcher)
         agent = react(
             prompt=(
-                "You are a disaster-response drone navigator. Use the flight "
+                "You are a disaster-response drone navigator piloting a "
+                "simulated drone through FUNCTION CALLS. Rules: act ONLY "
+                "through function calls — plain text changes nothing in the "
+                "simulator, so never narrate an action without emitting its "
+                "matching function call in the same turn. Use the flight "
                 "tools to search the area, rely on edge perception reports, "
                 "minimise steps, stay out of hazard zones, then land and "
                 "submit a summary of victim positions."
@@ -50,7 +57,9 @@ def drone_mission() -> Solver:
         )
         state.messages = agent_state.messages
         state.output = agent_state.output
-        state.store.set("sim_state", bridge.get_state())
+        final = bridge.get_state()
+        state.store.set("sim_state", final)
+        watcher.on_end({"state": final})
         bridge.close()
         return state
 

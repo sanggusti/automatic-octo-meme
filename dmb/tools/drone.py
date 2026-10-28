@@ -7,35 +7,65 @@ annotations are required by inspect-ai so the model knows how to call them.
 
 from __future__ import annotations
 
+import os
+
 from inspect_ai.tool import ContentImage, ContentText, Tool, tool
 
 from dmb.perception.edge import EdgePerception
 from dmb.perception.frames import to_data_url
 from dmb.sim.bridge import SimBridge
+from dmb.watch.recorder import NullWatcher, Watcher
 
 
 def edge_report_message(report, image: bytes | None) -> str | list:
-    """Text-only or multimodal (text + frame) tool result."""
+    """Text-only or multimodal (text + frame) tool result.
+
+    ``DMB_VISION=text`` forces text-only results so text models (e.g. the
+    flywheel teacher) can run the bench; the LM then navigates purely on
+    edge reports, which is the intended edge-first architecture.
+    """
     detections = ", ".join(f"{d.label}@({d.x},{d.y})" for d in report.detections)
     text = f"{report.summary} Detections: [{detections}]"
     if image is None:
         return text + (" [frame unavailable]" if report.frame_ref else "")
+    if os.environ.get("DMB_VISION", "").lower() == "text":
+        return text + " [frame withheld: text-only run]"
     return [
         ContentText(text=text),
         ContentImage(image=to_data_url(image), detail="low"),
     ]
 
 
-def _with_edge_report(obs_text: str, bridge: SimBridge, edge: EdgePerception) -> str:
-    state = bridge.get_state()
-    report = edge.on_step(int(state.get("steps", 0)))
-    if report is not None:
-        return f"{obs_text}\n[edge:{report.trigger}] {report.summary}"
-    return obs_text
-
-
-def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
+def make_drone_tools(
+    bridge: SimBridge, edge: EdgePerception, watcher: Watcher | None = None
+) -> list[Tool]:
     tools: list[Tool] = []
+    watch: Watcher = watcher or NullWatcher()
+
+    def _clock() -> tuple[float, int]:
+        state = bridge.get_state()
+        step = int(state.get("steps", 0))
+        return float(state.get("sim_time", step * 5.0)), step
+
+    def _with_edge_report(obs_text: str) -> str:
+        state = bridge.get_state()
+        report = edge.on_step(int(state.get("steps", 0)))
+        if report is not None:
+            t, step = _clock()
+            watch.on_event(
+                "edge",
+                t,
+                step,
+                trigger=report.trigger,
+                summary=report.summary,
+                frame_ref=report.frame_ref,
+            )
+            return f"{obs_text}\n[edge:{report.trigger}] {report.summary}"
+        return obs_text
+
+    def _action(tool: str, args: dict, obs_text: str) -> None:
+        t, step = _clock()
+        watch.on_event("action", t, step, tool=tool, args=args, obs=obs_text[:500])
 
     @tool
     def arm():
@@ -45,7 +75,9 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
             Returns:
                 Arm result message.
             """
-            return bridge.act("arm", {}).text
+            obs = bridge.act("arm", {}).text
+            _action("arm", {}, obs)
+            return obs
 
         return execute
 
@@ -61,7 +93,8 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
                 Takeoff result plus any edge perception report.
             """
             obs = bridge.act("takeoff", {"altitude_m": altitude_m})
-            return _with_edge_report(obs.text, bridge, edge)
+            _action("takeoff", {"altitude_m": altitude_m}, obs.text)
+            return _with_edge_report(obs.text)
 
         return execute
 
@@ -78,7 +111,8 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
                 Movement result plus any edge perception report.
             """
             obs = bridge.act("goto", {"x": x, "y": y})
-            return _with_edge_report(obs.text, bridge, edge)
+            _action("goto_location", {"x": x, "y": y}, obs.text)
+            return _with_edge_report(obs.text)
 
         return execute
 
@@ -94,7 +128,8 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
                 Loiter result plus any edge perception report.
             """
             obs = bridge.act("loiter", {"seconds": seconds})
-            return _with_edge_report(obs.text, bridge, edge)
+            _action("loiter", {"seconds": seconds}, obs.text)
+            return _with_edge_report(obs.text)
 
         return execute
 
@@ -106,7 +141,9 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
             Returns:
                 Landing result message.
             """
-            return bridge.act("land", {}).text
+            obs = bridge.act("land", {}).text
+            _action("land", {}, obs)
+            return obs
 
         return execute
 
@@ -118,7 +155,9 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
             Returns:
                 RTL result message.
             """
-            return bridge.act("rtl", {}).text
+            obs = bridge.act("rtl", {}).text
+            _action("return_to_launch", {}, obs)
+            return obs
 
         return execute
 
@@ -132,12 +171,14 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
             """
             state = bridge.get_state()
             drone = state["drone"]
-            return (
+            text = (
                 f"pos=({drone['x']},{drone['y']}) alt={drone['altitude_m']}m "
                 f"airborne={drone['airborne']} battery={drone['battery_pct']}% "
                 f"steps={state['steps']}/{state['step_budget']} "
                 f"violations={state['safety_violations']}"
             )
+            _action("get_telemetry", {}, text)
+            return text
 
         return execute
 
@@ -152,6 +193,12 @@ def make_drone_tools(bridge: SimBridge, edge: EdgePerception) -> list[Tool]:
             """
             report = edge.on_demand(int(bridge.get_state().get("steps", 0)))
             image = bridge.capture_frame(report.frame_ref) if report.frame_ref else None
+            t, step = _clock()
+            watch.on_event(
+                "edge", t, step, trigger="on_demand",
+                summary=report.summary, frame_ref=report.frame_ref,
+            )
+            _action("request_edge_report", {}, report.summary)
             return edge_report_message(report, image)
 
         return execute

@@ -88,3 +88,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-28: Phase C done; native SITL frames + vision tool results,
   edge-VLM baseline (stub-tested), Colosseum bridge (fake-tested) +
   verdict harness (mock-vs-SITL match live); suite 44 green.
+- 2026-10-28: Phase D done; L2 recorder + SFT/RLVR export, 224-pair
+  teacher set, LoRA finetune on Modal, held-out delta −0.049 (null;
+  scan-spam mechanism), dataset + weights on HF; suite 50+ green.
