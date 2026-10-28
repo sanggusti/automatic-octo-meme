@@ -30,3 +30,14 @@ difficulty:
   visibility: low
   victim_mobility: static
   hazard_drift: true
+dynamics:
+  terrain:
+    candidates:
+      - {x: 5, y: 8, slope: 1.5}
+      - {x: 4, y: 7, slope: 1.0}
+    sat_rate: 0.05
+    rain_multiplier: 2.0
+    raining: true
+    threshold: 1.0
+    debris_dir: [0, 1]
+    debris_len: 3

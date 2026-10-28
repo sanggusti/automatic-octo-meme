@@ -60,16 +60,44 @@ def test_phases_advance_with_steps():
     assert bridge.current_phase() == "debris"
 
 
+def _phased_metadata():
+    return {
+        "scenario": "test",
+        "seed": 0,
+        "grid": {"width": 10, "height": 10},
+        "victim_placements": [],
+        "hazards": [
+            {"x": 6, "y": 2, "radius": 3.0, "label": "surge", "active_from_phase": 1},
+            {"x": 9, "y": 6, "radius": 1.5, "label": "debris", "active_from_phase": 2},
+        ],
+        "difficulty": {
+            "phases": [
+                {"name": "p0", "until_step": 20},
+                {"name": "p1", "until_step": 40},
+                {"name": "p2", "until_step": 60},
+            ]
+        },
+    }
+
+
 def test_hazards_activate_by_phase():
-    meta = build_samples("tsunami", seeds=[1])[0].metadata
-    bridge = MockBridge.from_metadata(dict(meta))
-    # Surge channel (6,2) sleeps during recede-warning, live at wave-arrival.
+    bridge = MockBridge.from_metadata(_phased_metadata())
+    # Surge sleeps during p0, live at p1.
     assert bridge._in_hazard(6, 2) is False
     bridge.steps = 25
     assert bridge._in_hazard(6, 2) is True
-    # Debris field (9,6) sleeps until the debris phase.
+    # Debris sleeps until p2.
     assert bridge._in_hazard(9, 6) is False
     bridge.steps = 45
+    assert bridge._in_hazard(9, 6) is True
+
+
+def test_tsunami_water_adds_dynamic_danger():
+    meta = build_samples("tsunami", seeds=[1])[0].metadata
+    bridge = MockBridge.from_metadata(dict(meta))
+    # (9,6) floods at step 16, before its static debris phase (40).
+    assert bridge._in_hazard(9, 6) is False
+    bridge.steps = 20
     assert bridge._in_hazard(9, 6) is True
 
 

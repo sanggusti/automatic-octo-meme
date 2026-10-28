@@ -80,3 +80,5 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-27: Phase A done; difficulty bands + first-find/coverage
   metrics live; greedy 0.78 vs random 0.65 over 100 seeds; 3 human
   baselines recorded (0.30/0.37/0.63).
+- 2026-10-28: Phase B done; T0 fire/water/slip dynamics with snapshot
+  suite; containment is beat-the-spread; suite 31 green.
