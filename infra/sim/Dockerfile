@@ -55,7 +55,8 @@ ENV GZ_SIM_RESOURCE_PATH=/home/pilot/ardupilot_gazebo/models:/home/pilot/ardupil
 ENV PATH=/home/pilot/ardupilot/Tools/autotest:$PATH
 
 COPY --chown=pilot:pilot entrypoint.sh /home/pilot/entrypoint.sh
-RUN chmod +x /home/pilot/entrypoint.sh
+COPY --chown=pilot:pilot grab_frame.py /home/pilot/grab_frame.py
+RUN chmod +x /home/pilot/entrypoint.sh /home/pilot/grab_frame.py
 
 EXPOSE 5760
 CMD ["/home/pilot/entrypoint.sh"]

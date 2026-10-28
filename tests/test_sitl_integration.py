@@ -26,6 +26,8 @@ def _scripted_flight(seed: int = 1) -> dict:
         assert "Armed" in bridge.act("arm", {}).text
         assert "Takeoff" in bridge.act("takeoff", {"altitude_m": 5}).text
         assert bridge.drone.airborne
+        png = bridge.capture_frame("probe")
+        assert png is not None and png[:8] == b"\x89PNG\r\n\x1a\n"
         obs = bridge.act("goto", {"x": 2, "y": 2})
         assert "Moved" in obs.text or "Arrived" in obs.text or "En route" in obs.text
         assert "Landed" in bridge.act("land", {}).text
@@ -49,3 +51,25 @@ def test_parallel_workers_are_isolated():
     assert first["container"] != second["container"]
     assert first["state"]["seed"] == 1
     assert second["state"]["seed"] == 2
+
+
+def _short_rollout(bridge):
+    bridge.act("arm", {})
+    bridge.act("takeoff", {"altitude_m": 10})
+    bridge.act("goto", {"x": 2, "y": 2})
+    bridge.act("land", {})
+
+
+@needs_sitl
+def test_verdict_mock_vs_sitl_short_rollout():
+    from dmb.sim.bridge import MockBridge
+    from dmb.verdicts import compare_backends
+
+    from dmb.sim.bridge import GazeboSITLBridge
+
+    metas = [dict(s.metadata) for s in build_samples("forest_fire", seeds=[1])]
+    report = compare_backends(
+        MockBridge.from_metadata, GazeboSITLBridge.from_metadata, metas, _short_rollout
+    )
+    assert len(report) == 1
+    assert report[0]["match"], report[0]["diffs"]
