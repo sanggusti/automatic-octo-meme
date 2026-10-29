@@ -21,14 +21,18 @@ assets workstream replaces with pulls from ArduPilot sources:
 
 | Spec | Class | Provenance |
 |---|---|---|
-| `quad_iris_class` | multicopter | placeholder |
-| `fixedwing_scout` | fixed-wing | placeholder |
+| `quad_iris_class` | multicopter | sourced (#3): Copter-4.6.3 gazebo-iris.parm + ardupilot_gazebo@80dc9664 |
+| `fixedwing_scout` | fixed-wing | sourced (#3): Copter-4.6.3 gazebo-zephyr.parm + ardupilot_gazebo@80dc9664 |
+
+Per-value citations live as comments in `assets/drones/*.yaml`; hub pins in
+`assets/manifest.yaml`. Honest unknowns stay `null` (e.g. flight time —
+ArduPilot sources don't state it) rather than invented.
 
 ## Rules
 
 - A mission may only use capabilities the assigned spec declares
   (`DroneSpec.supports(...)`); the solver asserts this at episode start
-  (enforced in the sim-spike workstream).
+  (`assert_mission_capable`, enforced since #3).
 - Every spec change cites its source commit/URL in the PR.
 - Capability flags the backend cannot honour fail loudly at reset, never
   silently downgrade.

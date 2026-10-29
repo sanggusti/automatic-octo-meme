@@ -28,8 +28,13 @@ REQUIRED_KEYS = (
 class DroneSpec:
     name: str
     vehicle_class: str
-    provenance: str
+    provenance: str | dict
     raw: dict = field(compare=False)
+
+    @property
+    def sourced(self) -> bool:
+        """True once placeholder values were replaced by ArduPilot pulls."""
+        return self.provenance != "placeholder"
 
     @property
     def capabilities(self) -> dict:
@@ -60,9 +65,27 @@ def load_drone_spec(name: str, assets_dir: str | Path = ASSETS_DIR) -> DroneSpec
     return DroneSpec(
         name=raw["name"],
         vehicle_class=raw["vehicle_class"],
-        provenance=str(raw["provenance"]),
+        provenance=raw["provenance"],
         raw=raw,
     )
+
+
+# Capabilities the drone_mission solver needs from the assigned airframe.
+MISSION_REQUIRED_CAPABILITIES = (
+    "guided_takeoff",
+    "guided_goto",
+    "loiter",
+    "rtl",
+)
+
+
+def assert_mission_capable(spec: DroneSpec) -> None:
+    """Fail loudly when the airframe cannot fly bench missions."""
+    missing = [c for c in MISSION_REQUIRED_CAPABILITIES if not spec.supports(c)]
+    if missing:
+        raise ValueError(
+            f"Drone spec {spec.name!r} lacks mission capabilities: {missing}"
+        )
 
 
 def list_drone_specs(assets_dir: str | Path = ASSETS_DIR) -> list[str]:

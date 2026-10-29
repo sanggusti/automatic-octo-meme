@@ -32,3 +32,40 @@ def test_snapshot_budget_is_enforced():
     edge = StubEdgePerception(bridge, TriggerConfig(), FrameBudget(1))
     assert edge.on_demand(0).frame_ref is not None
     assert edge.on_demand(1).frame_ref is None
+
+
+def test_mobility_detectability_profile():
+    from dmb.perception.edge import (
+        MOBILITY_CONFIDENCE,
+        MOBILITY_RADIUS_FACTOR,
+        FrameBudget,
+        StubEdgePerception,
+        TriggerConfig,
+    )
+    from dmb.sim.bridge import MockBridge
+
+    assert MOBILITY_RADIUS_FACTOR["buried"] < MOBILITY_RADIUS_FACTOR["trapped"] < 1.0
+    assert MOBILITY_CONFIDENCE["buried"] < MOBILITY_CONFIDENCE["trapped"]
+
+    bridge = MockBridge()
+    bridge.reset(
+        {
+            "scenario": "mock",
+            "seed": 0,
+            "grid": {"width": 10, "height": 10},
+            "victim_placements": [
+                {"category": "human", "x": 2, "y": 0, "mobility": "static"},
+                {"category": "human", "x": 2, "y": 1, "mobility": "buried"},
+            ],
+            "hazards": [],
+        }
+    )
+    bridge.drone.airborne = True
+    edge = StubEdgePerception(bridge, TriggerConfig(), FrameBudget(max_snapshots=8))
+    detections, _ = edge._scan()
+    # Static victim at dist 2.0 seen; buried at dist ~2.2 beyond radius/3.
+    assert [(d.x, d.y) for d in detections] == [(2, 0)]
+    bridge.drone.x, bridge.drone.y = 2, 1
+    detections, _ = edge._scan()
+    buried = [d for d in detections if (d.x, d.y) == (2, 1)][0]
+    assert buried.confidence == MOBILITY_CONFIDENCE["buried"]

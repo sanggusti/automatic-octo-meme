@@ -181,3 +181,88 @@ def test_containment_monotonic_with_delay():
     assert fast["rescue_recall"] == slow["rescue_recall"] == 1.0
     assert fast["containment"] == 1.0
     assert slow["containment"] == 0.0
+
+
+def test_fire_weather_diverges_same_seed():
+    import pytest
+
+    mods = {
+        "weather_modifiers": {
+            "calm-wet": {"wind_speed": 1.0, "moisture": 0.45},
+            "windy-dry": {"wind_speed": 6.0, "moisture": 0.15},
+        }
+    }
+    calm = _run_fire({**FIRE_CFG, **mods, "weather_active": "calm-wet"})
+    windy = _run_fire({**FIRE_CFG, **mods, "weather_active": "windy-dry"})
+    assert calm.snapshot()["ignited"] != windy.snapshot()["ignited"]
+    assert len(windy.ignited) > len(calm.ignited)
+    repeat = _run_fire({**FIRE_CFG, **mods, "weather_active": "windy-dry"})
+    assert repeat.snapshot() == windy.snapshot()
+    with pytest.raises(ValueError, match="Unknown fire weather"):
+        FireModel({**FIRE_CFG, **mods, "weather_active": "storm"}, 6, 6)
+
+
+def test_weather_axis_end_to_end():
+    from dmb.scenarios import build_samples
+
+    plain = build_samples("forest_fire", seeds=[1])[0]
+    assert plain.metadata["weather_active"] is None
+    wet = build_samples("forest_fire", seeds=[1], weather="haze-heavy")[0]
+    assert wet.id == "forest_fire-seed-1-haze-heavy"
+    dry = build_samples("forest_fire", seeds=[1], weather="clear")[0]
+    b_wet, b_dry = MockBridge(), MockBridge()
+    b_wet.reset(dict(wet.metadata))
+    b_dry.reset(dict(dry.metadata))
+    assert b_wet._fire.wind_speed == 1.0
+    assert b_dry._fire.wind_speed == 6.0
+    import pytest
+    with pytest.raises(ValueError, match="not in .* options"):
+        build_samples("forest_fire", seeds=[1], weather="hurricane")
+
+
+def test_unknown_dynamics_key_fails_loudly():
+    import pytest
+
+    from dmb.scenarios import build_samples
+
+    meta = dict(build_samples("forest_fire", seeds=[1])[0].metadata)
+    meta["dynamics"] = {**meta["dynamics"], "fier": {"ignition": []}}
+    with pytest.raises(ValueError, match="Unknown dynamics blocks"):
+        MockBridge().reset(meta)
+
+
+def test_terrain_weather_diverges_slip_step():
+    import pytest
+
+    cfg = {
+        "candidates": [{"x": 5, "y": 8, "slope": 1.5}],
+        "sat_rate": 0.05,
+        "rain_multiplier": 2.0,
+        "raining": True,
+        "threshold": 1.0,
+        "debris_dir": [0, 1],
+        "debris_len": 3,
+        "weather_modifiers": {"rain-heavy": {"raining": True}, "overcast": {"raining": False}},
+    }
+    wet = SlipModel({**cfg, "weather_active": "rain-heavy"}, 10, 12)
+    dry = SlipModel({**cfg, "weather_active": "overcast"}, 10, 12)
+    for step in range(1, 61):
+        wet.step(step)
+        dry.step(step)
+    assert wet.slip_step == 11
+    assert dry.slip_step == 20
+    with pytest.raises(ValueError, match="Unknown terrain weather"):
+        SlipModel({**cfg, "weather_active": "snow"}, 10, 12)
+
+
+def test_unknown_mobility_fails_loudly():
+    import pytest
+
+    from dmb.scenarios import build_samples
+
+    meta = dict(build_samples("forest_fire", seeds=[1])[0].metadata)
+    meta["victim_placements"] = [
+        {**meta["victim_placements"][0], "mobility": "flying"}
+    ]
+    with pytest.raises(ValueError, match="Unknown victim mobility"):
+        MockBridge().reset(meta)

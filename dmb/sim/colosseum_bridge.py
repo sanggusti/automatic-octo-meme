@@ -30,6 +30,9 @@ def _require_airsim():
 
 
 class ColosseumBridge(MockBridge):
+    # MultirotorClient API surface: multicopters only.
+    SUPPORTED_VEHICLE_CLASSES = frozenset({"multicopter"})
+
     def __init__(
         self,
         host: str = "127.0.0.1",

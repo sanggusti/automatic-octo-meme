@@ -41,3 +41,7 @@ dynamics:
     threshold: 1.0
     debris_dir: [0, 1]
     debris_len: 3
+    # Weather coupling (#18): rain-heavy keeps raining; overcast dries it.
+    weather_modifiers:
+      rain-heavy: {raining: true}
+      overcast: {raining: false}

@@ -105,9 +105,18 @@ def build_samples(
     *,
     scenarios_dir: str | Path = SCENARIOS_DIR,
     mission_brief: str | None = None,
+    weather: str | None = None,
 ) -> list[Sample]:
-    """Expand (scenario, seeds) into inspect-ai samples with fixed metadata."""
+    """Expand (scenario, seeds) into inspect-ai samples with fixed metadata.
+
+    ``weather`` selects one of the scenario's weather options as the active
+    dynamics weather (``weather_active``); None keeps raw dynamics config.
+    """
     config = load_scenario(scenario, scenarios_dir)
+    if weather is not None and weather not in config.weather:
+        raise ValueError(
+            f"Weather {weather!r} not in {scenario} options {config.weather}"
+        )
     samples: list[Sample] = []
     for seed in seeds:
         rng = random.Random(seed)
@@ -125,10 +134,12 @@ def build_samples(
         samples.append(
             Sample(
                 input=brief,
-                id=f"{scenario}-seed-{seed}",
+                id=f"{scenario}-seed-{seed}" + (f"-{weather}" if weather else ""),
                 metadata={
                     "scenario": scenario,
                     "seed": seed,
+                    "drone_spec": "quad_iris_class",
+                    "weather_active": weather,
                     "grid": config.grid,
                     "victim_placements": placements,
                     "hazards": config.hazards,

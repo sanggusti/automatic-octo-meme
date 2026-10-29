@@ -96,3 +96,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-29: Single-slug scope locked (docs/inference.md, #7); L2
   enriched with pos+detections; mock T2 replay renderer (GIF+PNG)
   built and proven on a fresh Baseten episode.
+- 2026-10-29: Asset credibility bundle (#3/#17/#18/#19): sourced drone
+  specs + enforcement, fire/terrain weather coupling, mobility
+  detectability, Fuel pins + manifest, T1/T2 plans; suite 66 green.

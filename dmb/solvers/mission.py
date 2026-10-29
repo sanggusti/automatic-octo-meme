@@ -12,6 +12,7 @@ from inspect_ai.util import message_limit
 
 from dmb.config import Settings
 from dmb.perception.edge import FrameBudget, StubEdgePerception, TriggerConfig
+from dmb.sim.assets import assert_mission_capable, load_drone_spec
 from dmb.sim.bridge import GazeboSITLBridge, MockBridge
 from dmb.tools.drone import make_drone_tools
 from dmb.watch import watcher_from_env
@@ -29,6 +30,8 @@ def _bridge_for_backend(backend: str):
 def drone_mission() -> Solver:
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         backend = Settings.from_env().sim_backend
+        spec_name = str(dict(state.metadata).get("drone_spec", "quad_iris_class"))
+        assert_mission_capable(load_drone_spec(spec_name))
         bridge = _bridge_for_backend(backend).from_metadata(dict(state.metadata))
         edge = StubEdgePerception(
             bridge,
