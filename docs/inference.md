@@ -14,8 +14,12 @@ Verified against the installed inspect-ai provider: model id
 - Requirements for mission evals: the slug must support **tool calling**
   (all Model APIs do) and **vision** (model-specific — confirm per slug).
 - Status: **verified 2026-10-29** with `meta-models/muse-spark-open-1026`
-  (tool calling + vision + reasoning tokens confirmed live). Key is scoped
-  to that slug only — other slugs need their own grant.
+  (tool calling + vision + reasoning tokens confirmed live).
+- Scope lock (permanent): the Baseten key is granted for
+  `meta-models/muse-spark-open-1026` ONLY and no further slugs are coming.
+  The Baseten column of every sweep is exactly this model; model breadth
+  comes from Modal-hosted customs + scripted baselines + human runs, never
+  from more Baseten slugs. Do not plan multi-slug matrices.
 - Verified: smoke 1.0; forest_fire limit-1 0.608 (24 tool calls, full
   recall, image blocks in transcript); full 6-scenario pack 0.755
   (18/18, ~380k in / 78k out tokens + 1.6M cache reads; $ cost per

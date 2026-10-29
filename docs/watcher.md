@@ -9,7 +9,7 @@ score against visible evidence.
 | Layer | Content | Source | Status |
 |---|---|---|---|
 | L1 transcript | LM messages, tool calls + results, scores | inspect-ai `.eval` log | exists (`inspect view`) |
-| L2 event log | timestamped sim events: actions, edge reports, victim/hazard transitions, scorer inputs | new `dmb/watch/` recorder | specified here, built in watcher issue |
+| L2 event log | timestamped sim events: actions, edge reports, victim/hazard transitions, scorer inputs | new `dmb/watch/` recorder | built (#28); enriched with pos + detections |
 | L3 sim capture | backend-native replay artifacts | `--record-path` / `startRecording` / frame dumps | specified here, wired per backend |
 
 No single layer is sufficient: L1 shows reasoning, L2 shows episode
@@ -39,6 +39,8 @@ Every line is one event:
 
 - **Mock**: trajectory renderer — replay L2 into an SVG/frame sequence
   (grid, drone path, detections, hazard overlays). No external dependency.
+  BUILT: `python -m dmb.watch.render <sample.jsonl> --out <dir>` emits an
+  animated GIF + final PNG (world rebuilt from scenario+seed, hash-verified).
 - **Gazebo (Track 1)**: launch the sample's sim with
   `gz sim --record-path runs/<id>/sim/<sample> ...`; playback any episode
   with `gz sim --playback <path>`. `--record-resources` captures models and
@@ -56,8 +58,9 @@ Every line is one event:
 
 - **T0 transcript replay** — `inspect view` on the `.eval` log. Available now.
 - **T1 event replay** — CLI reading L2 JSONL: step, filter by kind, print the
-  episode as a narrated timeline. First watcher deliverable.
+  episode as a narrated timeline. BUILT (`dmb.watch.replay`).
 - **T2 sim playback** — backend-native (`--playback`, recorded video).
+  Mock leg BUILT (`dmb.watch.render` GIF+PNG); Gazebo + Colosseum legs open.
   Proves the world behaved as the transcript claims.
 - **T3 composite replay** — one timeline syncing L1+L2+L3 (transcript beside
   sim view beside edge reports). The "replay mode" target; built after T1+T2

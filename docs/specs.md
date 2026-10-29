@@ -93,3 +93,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
   scan-spam mechanism), dataset + weights on HF; suite 50+ green.
 - 2026-10-29: Baseten verified (muse-spark-open-1026, key scoped to that
   slug); smoke 1.0, forest_fire 0.608, pack 0.755 (18/18). #1 closed.
+- 2026-10-29: Single-slug scope locked (docs/inference.md, #7); L2
+  enriched with pos+detections; mock T2 replay renderer (GIF+PNG)
+  built and proven on a fresh Baseten episode.

@@ -42,30 +42,45 @@ def make_drone_tools(
     tools: list[Tool] = []
     watch: Watcher = watcher or NullWatcher()
 
-    def _clock() -> tuple[float, int]:
+    def _clock() -> tuple[float, int, int, int]:
         state = bridge.get_state()
         step = int(state.get("steps", 0))
-        return float(state.get("sim_time", step * 5.0)), step
+        drone = state.get("drone", {})
+        return (
+            float(state.get("sim_time", step * 5.0)),
+            step,
+            int(drone.get("x", 0)),
+            int(drone.get("y", 0)),
+        )
+
+    def _edge_event(report) -> None:
+        t, step, _x, _y = _clock()
+        watch.on_event(
+            "edge",
+            t,
+            step,
+            trigger=report.trigger,
+            summary=report.summary,
+            frame_ref=report.frame_ref,
+            detections=[
+                {"label": d.label, "x": d.x, "y": d.y} for d in report.detections
+            ],
+        )
 
     def _with_edge_report(obs_text: str) -> str:
         state = bridge.get_state()
         report = edge.on_step(int(state.get("steps", 0)))
         if report is not None:
-            t, step = _clock()
-            watch.on_event(
-                "edge",
-                t,
-                step,
-                trigger=report.trigger,
-                summary=report.summary,
-                frame_ref=report.frame_ref,
-            )
+            _edge_event(report)
             return f"{obs_text}\n[edge:{report.trigger}] {report.summary}"
         return obs_text
 
     def _action(tool: str, args: dict, obs_text: str) -> None:
-        t, step = _clock()
-        watch.on_event("action", t, step, tool=tool, args=args, obs=obs_text[:500])
+        t, step, x, y = _clock()
+        watch.on_event(
+            "action", t, step, tool=tool, args=args, obs=obs_text[:500],
+            pos=[x, y],
+        )
 
     @tool
     def arm():
@@ -193,11 +208,7 @@ def make_drone_tools(
             """
             report = edge.on_demand(int(bridge.get_state().get("steps", 0)))
             image = bridge.capture_frame(report.frame_ref) if report.frame_ref else None
-            t, step = _clock()
-            watch.on_event(
-                "edge", t, step, trigger="on_demand",
-                summary=report.summary, frame_ref=report.frame_ref,
-            )
+            _edge_event(report)
             _action("request_edge_report", {}, report.summary)
             return edge_report_message(report, image)
 

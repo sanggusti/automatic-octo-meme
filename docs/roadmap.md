@@ -19,10 +19,10 @@ Status as of 2026-10-27 in brackets.
    baseline tooling, first graded + baselined runs.
 6. **Fidelity track (Track 2)** (#6) — Colosseum/Unreal on the GPU workstation,
    `ColosseumBridge`, one parported scenario.
-7. **Baseline sweep** (#7) — 2–3 Baseten models + 1 Modal custom model over the
-   full scenario pack; first published results table. [partial 2026-10-29:
-   muse-spark-open-1026 pack 0.755 tabled in issue; key scoped to that slug,
-   more models + Modal side still open; #1 unblocked, #4 still open]
+7. **Baseline sweep** (#7) — fixed Baseten model + Modal customs + scripted
+   baselines over the full scenario pack; first published results table.
+   [partial 2026-10-29: muse-spark-open-1026 pack 0.755 tabled; single-slug
+   scope locked — breadth via Modal/human/baselines; #1 unblocked]
 8. **Results aggregation** (#8) — `runs/*/scores.json` → tables/plots script.
 9. **Tsunami scenario** (#15) — task wiring + phase dynamics + golden scores.
 10. **Scenario watcher** (#16) — L2 event log, T1 replay CLI, T2 backend
