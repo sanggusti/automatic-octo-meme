@@ -15,8 +15,10 @@ Status as of 2026-10-27 in brackets.
    specs with pulls from ArduPilot frame params + `ardupilot_gazebo`
    models; enforce
    capability gating in the solver.
-4. **Scenario pack** (#4) — difficulty stratification, weather/time dynamics,
-   per-disaster containment models replacing the v0 proxy.
+4. **Scenario pack** (#4) [done 2026-10-29: bands documented, weather/time
+   axes wired, per-kind containment + efficiency idle fix, determinism
+   holds] — difficulty stratification, weather/time dynamics, per-disaster
+   containment models replacing the v0 proxy.
 5. **Recon advisor + human evals** (#5) — human-actor check, guided human-agent
    baseline tooling, first graded + baselined runs.
 6. **Fidelity track (Track 2)** (#6) — Colosseum/Unreal on the GPU workstation,

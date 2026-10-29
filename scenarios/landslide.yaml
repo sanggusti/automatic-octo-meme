@@ -26,6 +26,11 @@ hazards:
 weather:
   - rain-heavy
   - overcast
+time_of_day:
+  - dawn
+  - day
+  - dusk
+  - night
 difficulty:
   visibility: low
   victim_mobility: static

@@ -55,6 +55,10 @@ class ScenarioConfig:
         return list(self.raw.get("weather", []))
 
     @property
+    def time_of_day_options(self) -> list:
+        return list(self.raw.get("time_of_day", ["day"]))
+
+    @property
     def difficulty(self) -> dict:
         return dict(self.raw.get("difficulty", {}))
 
@@ -106,16 +110,23 @@ def build_samples(
     scenarios_dir: str | Path = SCENARIOS_DIR,
     mission_brief: str | None = None,
     weather: str | None = None,
+    time_of_day: str | None = None,
 ) -> list[Sample]:
     """Expand (scenario, seeds) into inspect-ai samples with fixed metadata.
 
     ``weather`` selects one of the scenario's weather options as the active
     dynamics weather (``weather_active``); None keeps raw dynamics config.
+    ``time_of_day`` likewise selects visibility (``time_of_day_active``).
     """
     config = load_scenario(scenario, scenarios_dir)
     if weather is not None and weather not in config.weather:
         raise ValueError(
             f"Weather {weather!r} not in {scenario} options {config.weather}"
+        )
+    if time_of_day is not None and time_of_day not in config.time_of_day_options:
+        raise ValueError(
+            f"time_of_day {time_of_day!r} not in {scenario} options "
+            f"{config.time_of_day_options}"
         )
     samples: list[Sample] = []
     for seed in seeds:
@@ -131,15 +142,19 @@ def build_samples(
             "Locate victims and report their positions. Minimise flight "
             "time and avoid hazard zones."
         )
+        suffix = (f"-{weather}" if weather else "") + (
+            f"-{time_of_day}" if time_of_day else ""
+        )
         samples.append(
             Sample(
                 input=brief,
-                id=f"{scenario}-seed-{seed}" + (f"-{weather}" if weather else ""),
+                id=f"{scenario}-seed-{seed}{suffix}",
                 metadata={
                     "scenario": scenario,
                     "seed": seed,
                     "drone_spec": "quad_iris_class",
                     "weather_active": weather,
+                    "time_of_day_active": time_of_day,
                     "grid": config.grid,
                     "victim_placements": placements,
                     "hazards": config.hazards,

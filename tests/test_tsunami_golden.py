@@ -42,6 +42,11 @@ def test_tsunami_seed_1_golden():
         "found_any": 1.0,
         "first_find_step": 2.0,
         "coverage": 3 / 120,
+        "damage_cells": 120.0,
+        "unburned_fraction": 1.0,
+        "unflooded_fraction": 0.9,
+        "debris_cells": 0.0,
+        "buried_victims": 0.0,
         "composite": 0.5 * (7 / 13)
         + 0.2 * (7 / 13)
         + 0.15 * (11 / 12)

@@ -37,6 +37,17 @@ class TriggerConfig:
     heartbeat_every_steps: int = 5
     report_on_novelty: bool = True
     detection_radius: float = 3.0
+    time_of_day: str = "day"
+
+
+# Time-of-day visibility (#4): dawn/dusk haze and night darkness shrink the
+# edge detection radius. Unknown values fail loudly in _scan.
+TIME_OF_DAY_RADIUS_FACTOR = {
+    "dawn": 0.8,
+    "day": 1.0,
+    "dusk": 0.8,
+    "night": 0.5,
+}
 
 
 # Detectability by actor mobility (#19): trapped victims show less surface,
@@ -104,12 +115,20 @@ class StubEdgePerception(EdgePerception):
         novel: list = []
         if not self.bridge.drone.airborne:
             return detections, novel
+        try:
+            tod_factor = TIME_OF_DAY_RADIUS_FACTOR[self.config.time_of_day]
+        except KeyError:
+            raise ValueError(
+                f"Unknown time_of_day {self.config.time_of_day!r} "
+                f"(have {sorted(TIME_OF_DAY_RADIUS_FACTOR)})"
+            ) from None
+        radius = self.config.detection_radius * tod_factor
         for victim in self.bridge.victims_within(self.config.detection_radius):
             factor = MOBILITY_RADIUS_FACTOR.get(victim.mobility, 1.0)
             dist = math.hypot(
                 victim.x - self.bridge.drone.x, victim.y - self.bridge.drone.y
             )
-            if dist > self.config.detection_radius * factor:
+            if dist > radius * factor:
                 continue
             vid = id(victim)
             detections.append(

@@ -8,13 +8,16 @@ Computed deterministically from final sim state + transcript stats:
 |---|---|
 | `saved_human` / `saved_child` / `saved_animal` | Recall per victim category |
 | `rescue_recall` | Weight-weighted recall (child 3, human 2, animal 1) |
-| `containment` | Beat-the-spread: weight-weighted fraction of victims found before their cell became dangerous, × safety |
-| `efficiency` | `1 − steps/step_budget`, floored at 0 |
+| `containment` | Per-kind beat (see below), × safety |
+| `efficiency` | `(1 − steps/step_budget)` if any victim found, else 0 (idle fix) |
 | `safety` | 1.0 with no violations, −0.25 per violation, floored at 0 |
 | `tool_calls` | Transcript tool-call count (cost proxy) |
 | `found_any` | 1.0 if ≥1 victim found, else 0.0 (mean = first-find rate) |
 | `first_find_step` | Episode step of first find (−1 if none) |
 | `coverage` | Unique cells visited / total cells |
+| `damage_cells` | Cells with a scheduled danger step (exposure, informational) |
+| `unburned_fraction` / `unflooded_fraction` | 1 − ignited/flooded share (informational) |
+| `debris_cells` / `buried_victims` | Slip extent + buried count (informational) |
 | `composite` | `0.5·recall + 0.2·containment + 0.15·efficiency + 0.15·safety` |
 
 The inspect-ai scorer returns `composite` as the value with the full vector
@@ -28,11 +31,13 @@ dimension.
   is a tracked, reviewable diff.
 - **Efficiency-vs-safety trade-off** is scored explicitly (both terms feed
   `composite`), following the aerial-SAR benchmark literature.
-- `containment` is beat-the-spread on dynamics (`dmb/physics/`): each cell
-  records the step it became dangerous, each victim the step it was found.
-  Without dynamics every danger step is infinite and it reduces to recall ×
-  safety. Per-disaster refinements (fire perimeter held, water coverage
-  searched, rubble cleared) remain future work.
+- `containment` is per-kind beat-the-disaster (#4), × safety:
+  - tsunami: beat-the-wave — found before wave-arrival starts.
+  - fire/water/terrain kinds: beat-the-spread on cell danger steps.
+  - no dynamics (earthquake): dangers are infinite ⇒ reduces to recall.
+  True suppression-based containment (perimeter held, water pumped, rubble
+  cleared) awaits mitigation actions, which no tool currently offers; the
+  exposure metrics above quantify disaster scale in the meantime.
 
 ## Difficulty scoring (`dmb/difficulty.py`)
 
