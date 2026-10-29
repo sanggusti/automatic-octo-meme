@@ -69,3 +69,23 @@ def test_scores_from_l2_reproduces_breakdown(tmp_path):
         ' "rescue_recall": 1.0}\n'
     )
     assert scores_from_l2(path) == {"composite": 0.75, "rescue_recall": 1.0}
+
+
+def test_table_run_filter(tmp_path, monkeypatch):
+    import sys
+
+    from dmb.aggregate import main
+
+    _write_run(
+        tmp_path, "r1", "mA", [_sample("a-1", "forest_fire", 0.5)]
+    )
+    _write_run(tmp_path, "r2", "mB", [_sample("b-1", "forest_fire", 1.0)])
+    out = tmp_path / "t.md"
+    monkeypatch.setattr(
+        sys, "argv",
+        ["aggregate", "table", "--runs", str(tmp_path), "--out", str(out),
+         "--run", "r2"],
+    )
+    main()
+    text = out.read_text()
+    assert "mB" in text and "mA" not in text

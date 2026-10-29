@@ -25,10 +25,10 @@ Status as of 2026-10-27 in brackets.
    hello flight green, mock-vs-Colosseum verdict 3/3 non-vacuous] —
    Colosseum/Unreal on the GPU workstation, `ColosseumBridge`, one
    parported scenario.
-7. **Baseline sweep** (#7) — fixed Baseten model + Modal customs + scripted
-   baselines over the full scenario pack; first published results table.
-   [partial 2026-10-29: muse-spark-open-1026 pack 0.755 tabled; single-slug
-   scope locked — breadth via Modal/human/baselines; #1 unblocked]
+7. **Baseline sweep** (#7) [done 2026-10-29: 4-column matrix tabled —
+   spark 0.755, heuristic 0.704, random 0.638, qwen-7b 0.535] — fixed
+   Baseten model + Modal customs + scripted baselines over the full
+   scenario pack; first published results table.
 8. **Results aggregation** (#8) [done 2026-10-29: record + table CLIs,
    3 runs backfilled, reproduces posted numbers] — `runs/*/scores.json` →
    tables/plots script.
