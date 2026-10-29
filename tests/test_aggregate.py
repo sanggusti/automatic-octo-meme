@@ -55,3 +55,17 @@ def test_csv_has_full_vectors(tmp_path):
 
 def test_empty_registry_renders_header(tmp_path):
     assert render_markdown(_load_rows(tmp_path)).startswith("| model |")
+
+
+def test_scores_from_l2_reproduces_breakdown(tmp_path):
+    import json
+
+    from dmb.aggregate import scores_from_l2
+
+    path = tmp_path / "s.jsonl"
+    path.write_text(
+        '{"t": 0.0, "step": 0, "kind": "note", "event": "episode_start"}\n'
+        '{"t": -1.0, "step": -1, "kind": "score", "composite": 0.75,'
+        ' "rescue_recall": 1.0}\n'
+    )
+    assert scores_from_l2(path) == {"composite": 0.75, "rescue_recall": 1.0}

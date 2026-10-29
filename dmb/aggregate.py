@@ -40,6 +40,8 @@ def record_run(
     log_path: str | Path,
     runs_dir: str | Path = "runs",
     notes: list[str] | None = None,
+    l2_dir: str | Path | None = None,
+    l3_dir: str | Path | None = None,
 ) -> dict:
     from inspect_ai.log import read_eval_log  # noqa: PLC0415
 
@@ -66,13 +68,34 @@ def record_run(
     record = registry.start_run(
         run_id, task=task, model=model, scenario=scenario, seeds=sorted(seeds)
     )
-    if notes:
-        record.notes.extend(notes)
-        config_path = Path(runs_dir) / run_id / "config.json"
-        config_path.write_text(json.dumps(record.__dict__, indent=2, default=str))
+    # Registry links all three evidence layers (#16).
+    links = {"l1_eval_log": str(log_path)}
+    if l2_dir is not None:
+        links["l2_trajectories"] = str(l2_dir)
+    if l3_dir is not None:
+        links["l3_sim"] = str(l3_dir)
+    record.notes.extend(notes or [])
+    config_path = Path(runs_dir) / run_id / "config.json"
+    payload = json.loads(config_path.read_text())
+    payload["notes"] = record.notes
+    payload["evidence"] = links
+    config_path.write_text(json.dumps(payload, indent=2, default=str))
     registry.write_scores(run_id, {"samples": samples})
     registry.finish_run(run_id, eval_logs=[str(log_path)])
     return {"run_id": run_id, "samples": len(samples)}
+
+
+def scores_from_l2(l2_path: str | Path) -> dict:
+    """Extract the scorer's metric vector from an L2 log (audit rule).
+
+    The mission scorer appends its breakdown as the ``score`` event, so
+    L2 alone reproduces the sample's scores without the .eval log.
+    """
+    for line in Path(l2_path).read_text(encoding="utf-8").splitlines():
+        event = json.loads(line)
+        if event.get("kind") == "score":
+            return {k: v for k, v in event.items() if k not in {"t", "step", "kind"}}
+    raise ValueError(f"no score event in {l2_path}")
 
 
 def _load_rows(runs_dir: Path) -> list[dict]:
@@ -155,6 +178,8 @@ def main() -> None:
     record.add_argument("--log", required=True)
     record.add_argument("--runs", default="runs")
     record.add_argument("--note", action="append", default=[])
+    record.add_argument("--l2-dir", default=None)
+    record.add_argument("--l3-dir", default=None)
     table = sub.add_parser("table", help="Render markdown + CSV from the registry.")
     table.add_argument("--runs", default="runs")
     table.add_argument("--out", required=True)
@@ -165,7 +190,7 @@ def main() -> None:
             json.dumps(
                 record_run(
                     args.run_id, args.task, args.model, args.scenario,
-                    args.log, args.runs, args.note,
+                    args.log, args.runs, args.note, args.l2_dir, args.l3_dir,
                 ),
                 indent=2,
             )

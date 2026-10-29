@@ -29,6 +29,19 @@ def _require_airsim():
     return airsim
 
 
+def _encode_png(response) -> bytes:
+    """Encode a simGetImages response (raw RGB uint8 + dims) as PNG."""
+    import io  # noqa: PLC0415
+
+    from PIL import Image  # noqa: PLC0415
+
+    raw = bytes(response.image_data_uint8)
+    img = Image.frombytes("RGB", (int(response.width), int(response.height)), raw)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 class ColosseumBridge(MockBridge):
     # MultirotorClient API surface: multicopters only.
     SUPPORTED_VEHICLE_CLASSES = frozenset({"multicopter"})
@@ -55,6 +68,8 @@ class ColosseumBridge(MockBridge):
 
     # -- lifecycle ------------------------------------------------------
     def reset(self, metadata: dict) -> object:
+        from dmb.watch.l3 import l3_enabled, l3_sample_dir  # noqa: PLC0415
+
         obs = super().reset(metadata)
         if self._client is None:
             self._airsim = _require_airsim()
@@ -66,10 +81,24 @@ class ColosseumBridge(MockBridge):
         p = pose.position
         self._home_ned = (p.x_val, p.y_val, p.z_val)
         self._sync_from_pose()
+        # T2 capture (#16): sim-side recording + local keyframes dir.
+        # startRecording takes no vehicle arg (beta client source, Recording APIs).
+        self._l3_dir = l3_sample_dir(self._sample_id) if l3_enabled() else None
+        if self._l3_dir is not None:
+            try:
+                self._client.startRecording()
+            except Exception as exc:
+                (self._l3_dir / "recording.failed").write_text(f"{exc}\n")
         return obs
 
     def close(self) -> None:
         if self._client is not None:
+            l3_dir = getattr(self, "_l3_dir", None)
+            if l3_dir is not None:
+                try:
+                    self._client.stopRecording()
+                except Exception as exc:
+                    l3_dir.joinpath("recording.failed").write_text(f"{exc}\n")
             try:
                 self._client.armDisarm(False, self.vehicle_name)
                 self._client.enableApiControl(False, self.vehicle_name)
@@ -187,7 +216,7 @@ class ColosseumBridge(MockBridge):
         self.drone.battery_pct = max(0.0, 100.0 - self.steps * self.battery_drain)
 
     def capture_frame(self, ref: str) -> bytes | None:
-        """Native frame via simGetImages; rendered fallback on failure."""
+        """Native frame via simGetImages (raw RGB -> PNG); rendered fallback."""
         assert self._client is not None
         try:
             airsim = self._airsim or _require_airsim()
@@ -196,7 +225,13 @@ class ColosseumBridge(MockBridge):
             ]
             responses = self._client.simGetImages(requests, self.vehicle_name)
             if responses and responses[0].image_data_uint8:
-                return bytes(responses[0].image_data_uint8)
+                png = _encode_png(responses[0])
+                l3_dir = getattr(self, "_l3_dir", None)
+                if l3_dir is not None:
+                    keyframes = l3_dir / "keyframes"
+                    keyframes.mkdir(exist_ok=True)
+                    keyframes.joinpath(f"{ref}.png").write_bytes(png)
+                return png
         except Exception:
             pass
         return super().capture_frame(ref)

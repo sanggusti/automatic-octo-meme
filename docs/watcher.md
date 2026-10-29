@@ -59,12 +59,16 @@ Every line is one event:
 - **T0 transcript replay** — `inspect view` on the `.eval` log. Available now.
 - **T1 event replay** — CLI reading L2 JSONL: step, filter by kind, print the
   episode as a narrated timeline. BUILT (`dmb.watch.replay`).
-- **T2 sim playback** — backend-native (`--playback`, recorded video).
-  Mock leg BUILT (`dmb.watch.render` GIF+PNG); Gazebo + Colosseum legs open.
-  Proves the world behaved as the transcript claims.
-- **T3 composite replay** — one timeline syncing L1+L2+L3 (transcript beside
-  sim view beside edge reports). The "replay mode" target; built after T1+T2
-  exist. UI shape (web timeline vs. notebook) decided in the watcher issue.
+- **T2 sim playback** — backend-native. ALL LEGS BUILT: mock GIF+PNG
+  (`dmb.watch.render`); Gazebo `--record-path` per sample + `--playback`
+  (verified live incl. the fresh-leaf-dir gotcha); Colosseum
+  start/stopRecording + simGetImages keyframes (fake-tested, calls
+  verified against beta client source; sim-side live recording check
+  deferred to a PC session). Proves the world behaved as claimed.
+- **T3 composite replay** — BUILT (`dmb.watch.compose`): one HTML page per
+  episode with score card, embedded L3 replay, L2 timeline, and L1
+  transcript turns. Proven on the Baseten replay episode (49 turns, 37
+  events, 2 artifacts, L2==eval audit holds).
 
 ## Budgets & rules
 

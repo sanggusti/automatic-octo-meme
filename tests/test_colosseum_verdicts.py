@@ -96,9 +96,23 @@ class FakeMultirotorClient:
         return _Future(go)
 
     def simGetImages(self, requests, vehicle=""):
-        buf = io.BytesIO()
-        Image.new("RGB", (32, 32), (9, 9, 9)).save(buf, format="PNG")
-        return [type("Resp", (), {"image_data_uint8": buf.getvalue()})()]
+        raw = bytes([9, 9, 9]) * (32 * 32)
+        return [
+            type(
+                "Resp",
+                (),
+                {"image_data_uint8": raw, "width": 32, "height": 32},
+            )()
+        ]
+
+    def startRecording(self):
+        self.calls.append("recording=start")
+
+    def stopRecording(self):
+        self.calls.append("recording=stop")
+
+    def isRecording(self):
+        return True
 
 
 def _metadata():
@@ -163,3 +177,54 @@ def test_verdict_mock_vs_mock_matches():
     assert all(
         entry["scores"]["a"]["rescue_recall"] > 0 for entry in report
     ), report
+
+
+def test_t2_recording_lifecycle_and_keyframes(tmp_path, monkeypatch):
+    import types
+
+    from dmb.sim.colosseum_bridge import ColosseumBridge
+
+    monkeypatch.setenv("DMB_L3_DIR", str(tmp_path / "sim"))
+    client = FakeMultirotorClient()
+    bridge = ColosseumBridge(client=client)
+    bridge.reset(_metadata())
+    assert "recording=start" in client.calls
+    bridge._airsim = types.SimpleNamespace(
+        ImageRequest=lambda *args: ("req", args), ImageType=types.SimpleNamespace(Scene=0)
+    )
+    png = bridge.capture_frame("kf1")
+    assert png is not None and png[:8] == b"\x89PNG\r\n\x1a\n"
+    keyframe = tmp_path / "sim" / "forest_fire-seed-1" / "keyframes" / "kf1.png"
+    assert keyframe.exists()
+    Image.open(keyframe).verify()
+    bridge.close()
+    assert "recording=stop" in client.calls
+
+
+def test_t2_recording_failure_marks_loudly(tmp_path, monkeypatch):
+    from dmb.sim.colosseum_bridge import ColosseumBridge
+
+    monkeypatch.setenv("DMB_L3_DIR", str(tmp_path / "sim"))
+
+    class FailingRec(FakeMultirotorClient):
+        def startRecording(self):
+            raise RuntimeError("disk full")
+
+    bridge = ColosseumBridge(client=FailingRec())
+    bridge.reset(_metadata())  # mission proceeds; failure is marked, not fatal
+    marker = tmp_path / "sim" / "forest_fire-seed-1" / "recording.failed"
+    assert "disk full" in marker.read_text()
+    bridge.close()
+
+
+def test_t2_disabled_by_env(tmp_path, monkeypatch):
+    from dmb.sim.colosseum_bridge import ColosseumBridge
+
+    monkeypatch.setenv("DMB_L3", "off")
+    monkeypatch.setenv("DMB_L3_DIR", str(tmp_path / "sim"))
+    client = FakeMultirotorClient()
+    bridge = ColosseumBridge(client=client)
+    bridge.reset(_metadata())
+    assert "recording=start" not in client.calls
+    assert not (tmp_path / "sim").exists()
+    bridge.close()

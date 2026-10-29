@@ -116,6 +116,9 @@ class MockBridge(SimBridge):
         self.height = int(grid.get("height", 10))
         self.scenario = str(metadata.get("scenario", "mock"))
         self.seed = int(metadata.get("seed", 0))
+        self._sample_id = str(
+            metadata.get("sample_id") or f"{self.scenario}-seed-{self.seed}"
+        )
         self._weather_active = metadata.get("weather_active")
         # Actor schema (#19): unknown mobility fails loudly at reset.
         for v in metadata.get("victim_placements", []):
@@ -509,14 +512,28 @@ class GazeboSITLBridge(MockBridge):
                 )
         return super().capture_frame(ref)
 
+    def _docker_run_args(self) -> list[str]:
+        """docker run argv; L3 recording mount is opt-out (DMB_L3=off)."""
+        from dmb.watch.l3 import l3_enabled, l3_sample_dir  # noqa: PLC0415
+
+        args = ["docker", "run", "-d", "--rm", "-e", f"GZ_PARTITION={self._partition}"]
+        self._l3_dir = None
+        if l3_enabled():
+            sample_id = getattr(self, "_sample_id", "unknown-sample")
+            self._l3_dir = l3_sample_dir(sample_id)
+            args += [
+                "-v", f"{self._l3_dir}:/record",
+                "-e", "DMB_GZ_RECORD_PATH=/record",
+            ]
+        args += ["-p", "127.0.0.1::5760", self.image]
+        return args
+
     def _start_worker(self) -> None:
         # Unique transport partition: parallel workers must never merge
         # into one Gazebo discovery domain.
         self._partition = f"dmb-{uuid.uuid4().hex[:12]}"
         proc = subprocess.run(
-            ["docker", "run", "-d", "--rm", "-e", f"GZ_PARTITION={self._partition}",
-             "-p", "127.0.0.1::5760", self.image],
-            capture_output=True, text=True, timeout=120,
+            self._docker_run_args(), capture_output=True, text=True, timeout=120
         )
         if proc.returncode != 0:
             raise RuntimeError(f"docker run failed: {proc.stderr.strip()}")
