@@ -86,3 +86,44 @@ def test_image_blocks_become_marker():
     )
     pairs = messages_to_sft_pairs([user, tool, turn])
     assert pairs[0][1]["content"] == "[frame omitted]"
+
+
+def test_render_produces_gif_and_png(tmp_path):
+    import json
+    from dmb.scenarios import build_samples
+    from dmb.watch.render import render
+
+    meta = build_samples("forest_fire", seeds=[1])[0].metadata
+    events = [
+        {"t": 0.0, "step": 0, "kind": "note", "event": "episode_start",
+         "scenario": "forest_fire", "seed": 1, "world_hash": meta["world_hash"]},
+        {"t": 0.0, "step": 0, "kind": "action", "tool": "arm", "args": {},
+         "obs": "Armed.", "pos": [0, 0]},
+        {"t": 5.0, "step": 1, "kind": "edge", "trigger": "novelty",
+         "summary": "found one", "detections": [{"label": "human", "x": 5, "y": 5}]},
+        {"t": 5.0, "step": 1, "kind": "action", "tool": "goto_location",
+         "args": {"x": 5, "y": 5}, "obs": "Moved.", "pos": [5, 5]},
+        {"t": -1.0, "step": -1, "kind": "score", "composite": 0.9},
+    ]
+    src = tmp_path / "ep.jsonl"
+    src.write_text("\n".join(json.dumps(e) for e in events))
+    out = render(src, tmp_path / "replays")
+    assert out["frames"] == 3  # 2 actions + done card
+    gif = tmp_path / "replays" / "ep.gif"
+    png = tmp_path / "replays" / "ep_final.png"
+    assert gif.stat().st_size > 0 and png.stat().st_size > 0
+    from PIL import Image
+    assert Image.open(gif).n_frames == 3
+
+
+def test_render_rejects_hash_mismatch(tmp_path):
+    import json
+    import pytest
+    from dmb.watch.render import render
+
+    src = tmp_path / "ep.jsonl"
+    src.write_text(json.dumps(
+        {"t": 0.0, "step": 0, "kind": "note", "event": "episode_start",
+         "scenario": "forest_fire", "seed": 1, "world_hash": "deadbeef"}) + "\n")
+    with pytest.raises(ValueError, match="world_hash mismatch"):
+        render(src, tmp_path / "replays")
