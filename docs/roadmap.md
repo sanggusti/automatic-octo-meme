@@ -10,8 +10,10 @@ Status as of 2026-10-27 in brackets.
    proofs, 2-parallel isolation] — pinned image builds; SITL+Gazebo boots;
    scripted GUIDED takeoff/hover/land; MAVLink message set documented;
    `GazeboSITLBridge` implemented against the `SimBridge` contract.
-3. **Drone-spec assets** (#3) — replace placeholder specs with pulls from
-   ArduPilot frame params + `ardupilot_gazebo` models; enforce
+3. **Drone-spec assets** (#3) [done 2026-10-29: both specs sourced with
+   per-value citations, solver + reset enforcement] — replace placeholder
+   specs with pulls from ArduPilot frame params + `ardupilot_gazebo`
+   models; enforce
    capability gating in the solver.
 4. **Scenario pack** (#4) — difficulty stratification, weather/time dynamics,
    per-disaster containment models replacing the v0 proxy.
@@ -27,9 +29,12 @@ Status as of 2026-10-27 in brackets.
 9. **Tsunami scenario** (#15) — task wiring + phase dynamics + golden scores.
 10. **Scenario watcher** (#16) — L2 event log, T1 replay CLI, T2 backend
     capture, T3 composite design.
-11. **Asset pack: vegetation + fire** (#17) — fuel grid, spread model, T1 flora.
-12. **Asset pack: terrain + water** (#18) — surge/slip dynamics, T1 water/terrain.
-13. **Asset pack: actors** (#19) — human/animal param schema + T1 figures.
+11. **Asset pack: vegetation + fire** (#17) [done 2026-10-29: fire weather
+    coupling + tolerance bands, Fuel tree pins + placement script, T2 plan].
+12. **Asset pack: terrain + water** (#18) [done 2026-10-29: slip weather
+    coupling + rule doc, buoyancy spike (stock plugins), loud reset].
+13. **Asset pack: actors** (#19) [done 2026-10-29: mobility schema +
+    detectability profile, figure pins + scaling, ethics rule].
 14. **Frontier A: eval rigor** (#25) [done 2026-10-27: difficulty bands,
     intermediate metrics, 3 human baselines, 100-seed CI] — difficulty,
     intermediate metrics, human baselines, 100+ seeds, heuristic agents.

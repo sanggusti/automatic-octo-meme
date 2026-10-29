@@ -1,0 +1,46 @@
+# External asset pins (#17/#18/#19). Every external file: URL + sha256 + license.
+# Generated assets pin their generator instead. CI/test_manifest.py enforces.
+vegetation:
+  pine-tree:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20Tree/6/Pine%20Tree.zip
+    version: 6
+    sha256: d436a44229321314e79e4c2ba709dc926e833a5b5d90d16c5d085c2a74576e25
+    license: CC0-1.0
+    use: T1 conifer instances; species class pine
+  oak-tree:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree/7/Oak%20tree.zip
+    version: 7
+    sha256: ae128176f707b571d2a2a47a1ab6b80596e81d96402501a64f4f28a49543daa5
+    license: CC0-1.0
+    use: T1 broadleaf instances; species class oak
+  bush:
+    generator: procedural canopy-sphere SDF (place_trees.py --bushes)
+    license: generated (no external file)
+    use: T1 underbrush; no suitable Fuel bush found (2026-10-29 spike)
+actors:
+  standing-person:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Standing%20person/3/Standing%20person.zip
+    version: 3
+    sha256: 385c4c518662f75b6c719849a4f47100bac7617058407c7d6db41bf802fc5c5e
+    license: CC0-1.0
+    use: T1 adult figures (human category, scale 1.0; child 0.7)
+  male-visitor:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Male%20visitor/2/Male%20visitor.zip
+    version: 2
+    sha256: 5930f629bacd9eccf9554b5a4485a91d65afa7833bfb43ee996e5efef006674b
+    license: CC0-1.0
+    use: T1 adult figure variant (visual variety, same params)
+  animal-placeholder:
+    generator: procedural scaled quadruped capsule (documented in physics-assets.md)
+    license: generated (no external file)
+    use: T1 wildlife until a CC0 animal mesh is vetted (GSO hits are toy scans)
+drones:
+  # Handled by per-value provenance in assets/drones/*.yaml (#3), not hub zips.
+  quad_iris_class:
+    params: https://github.com/ArduPilot/ardupilot/blob/Copter-4.6.3/Tools/autotest/default_params/gazebo-iris.parm
+    model: https://github.com/ArduPilot/ardupilot_gazebo/blob/80dc9664/models/iris_with_gimbal/model.sdf
+    license: GPL-3.0 (ArduPilot sources)
+  fixedwing_scout:
+    params: https://github.com/ArduPilot/ardupilot/blob/Copter-4.6.3/Tools/autotest/default_params/gazebo-zephyr.parm
+    model: https://github.com/ArduPilot/ardupilot_gazebo/blob/80dc9664/models/zephyr_with_ardupilot/model.sdf
+    license: GPL-3.0 (ArduPilot sources)

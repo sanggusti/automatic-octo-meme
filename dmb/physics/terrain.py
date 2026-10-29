@@ -20,6 +20,18 @@ class SlipModel:
         self.sat_rate = float(config.get("sat_rate", 0.05))
         self.rain_multiplier = float(config.get("rain_multiplier", 2.0))
         self.raining = bool(config.get("raining", True))
+        # Weather coupling (#18): explicit weather overrides raining.
+        self.weather_active = config.get("weather_active")
+        modifiers = config.get("weather_modifiers", {})
+        if self.weather_active is not None:
+            if self.weather_active not in modifiers:
+                raise ValueError(
+                    f"Unknown terrain weather {self.weather_active!r} "
+                    f"(have {sorted(modifiers)})"
+                )
+            self.raining = bool(
+                modifiers[self.weather_active].get("raining", self.raining)
+            )
         self.threshold = float(config.get("threshold", 1.0))
         debris = tuple(config.get("debris_dir", [0, 1]))
         self.debris_dir = (int(debris[0]), int(debris[1]))

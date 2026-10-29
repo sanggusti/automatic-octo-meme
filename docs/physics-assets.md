@@ -1,8 +1,8 @@
 # Physics Assets — Convincing Worlds for Decision Benchmarks
 
-Status: T0 dynamics implemented in `dmb/physics/` (#26) — FBP-inspired cell
-fire spread, surge-front water with drift, saturation-triggered slip with
-debris burial. T1 plugins and T2 dressing remain in #17/#18.
+Status: T0 dynamics in `dmb/physics/` (#26) + weather coupling (#17/#18)
++ T1 source pins with hashes (#17/#19) + vegetation placement script.
+T1 world builds and T2 dressing remain (tracked in #6).
 
 Principle: physics must be **convincing where decisions depend on it** and
 honestly simple elsewhere. A fire model that spreads wrong teaches the
@@ -34,13 +34,22 @@ redefine, T0 semantics.
 
 ### Fire spread — bush-to-bush transfer
 
-- Model: seeded probabilistic cellular spread over the fuel grid —
-  ignition probability per step from neighbor state × flammability ×
-  wind × moisture. Defined in the asset issue, implemented once in T0,
-  mirrored by a Gazebo plugin (T1) and particles (T2).
-- Wind/weather coupling comes from the scenario's weather options, so
-  identical seeds under different weather diverge documentably.
-- Check: fixed-seed spread snapshot test + documented spread-rate tolerance.
+- Model: deterministic exposure-accumulation cellular spread over the
+  fuel grid (Phase B kept determinism over the originally specified
+  probabilistic ignition: same seed + weather ⇒ bit-identical spread,
+  which the snapshot tests pin). ROS = base × fuel × (1−moisture) ×
+  wind-alignment; ignite at exposure ≥ threshold.
+- Wind/weather coupling (#17): `weather_modifiers` per scenario override
+  wind/moisture; `build_samples(..., weather=...)` makes weather a sample
+  axis. Same seed diverges across weather by construction (tested).
+- Spread-rate tolerance (forest_fire seeds 1–3 @60 steps, ignited cells):
+  haze-heavy 2 (ignitions only — wet+still self-contains), haze-moderate
+  39, clear 43. Seed-independent (fixed ignition + uniform fuel).
+- Check: fixed-seed spread snapshot test + the tolerance bands above.
+- T1: `assets/vegetation/place_trees.py` emits SDF `<include>` per fuel
+  cell (seeded pine/oak from pinned Fuel models) + `fuel_tags.json`
+  sidecar (instance → flammability). T2 plan: UE particle fire driven by
+  the same per-cell ignited/burning/burned schedule; no T0 redefinition.
 
 ### Water — floods, flash floods, tsunami
 
@@ -50,8 +59,13 @@ redefine, T0 semantics.
   affects victim drift and no-fly/low-altitude risk.
 - Tsunami: receding-water warning phase → wave arrival → debris field;
   scenario YAML defines phase timings.
-- T1 needs a water/buoyancy plugin (spike verifies available plugin vs.
-  custom); T2 uses engine water on the same level/current parameters.
+- T1 spike outcome (#18): stock plugins — `gz-sim-buoyancy-system`
+  (volume-from-collision buoyancy) + `gz-sim-hydrodynamics-system`
+  (current/drag), both shipping with Gazebo incl. Harmonic. No custom
+  plugin needed: water plane mesh at z=level, T0 surge schedule drives
+  the level/current parameters. T2 plan: UE engine water on the same
+  level/current parameters; debris field = instanced meshes on T0 debris
+  cells.
 
 ### Terrain & soils — landslide physics
 
@@ -60,6 +74,14 @@ redefine, T0 semantics.
   debris path). Rain saturates; saturation + slope triggers.
 - Debris alters traversability/visibility along the path; victims in the
   path become buried (detectability drops, rescue cost rises).
+- Stability rule (T0, tested): saturation += sat_rate × rain_multiplier
+  (when raining) each step; at threshold, the steepest candidate slips
+  once per episode; debris runs debris_len cells along debris_dir.
+  Weather coupling (#18): landslide `overcast` sets raining=false
+  (slip @20 vs @11 under rain-heavy, tested).
+- T1: SDFormat heightmap geometry (grayscale PNG → heightfield) for
+  slope terrain; debris = tinted decal strip on T0 debris cells. T2
+  plan: UE landscape import from the same heightmap + GIS refinement.
 - Check: slip-event determinism per seed + stability-rule unit tests.
 
 ### Actors — humans, children, animals
@@ -67,11 +89,20 @@ redefine, T0 semantics.
 - Params per actor: category, mobility (`static` | `trapped` | `buried` |
   `mobile`), detectability profile (visual size, thermal/audio cue flags
   for later backends), drift behavior in water.
-- T0: grid tokens (exists). T1: articulated/static figures with category
-  scaling; T2: animated meshes. Behavior beyond T0 params is cosmetic.
+- T0: grid tokens (exists) + mobility-validated schema
+  (static/trapped/buried/mobile; unknown mobility fails at reset) +
+  water drift for mobile flooded victims (exists).
+- Detectability profile (#19, enforced in the edge stub, mirrored by T1):
+  static/mobile full radius @0.9 confidence; trapped 0.75× @0.7; buried
+  ⅓× @0.5. Debris burial (landslide) and water drift feed this directly.
+- T1: pinned Fuel figures (manifest) with category scaling — human 1.0,
+  child 0.7 (scaled standing-person), animal = procedural placeholder
+  until a CC0 mesh is vetted (GSO hits are toy scans). T2: animated
+  meshes; behavior beyond T0 params stays cosmetic.
 - Ethical rule: actors are rescue objectives with documented weights
-  (`docs/metrics.md`); no gore, no suffering simulation — the benchmark
-  scores decisions, not depictions.
+  (`docs/metrics.md` VICTIM_WEIGHTS, unchanged by this work); no gore,
+  no suffering simulation — the benchmark scores decisions, not
+  depictions.
 
 ## Cross-cutting rules
 

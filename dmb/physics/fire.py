@@ -32,6 +32,21 @@ class FireModel:
         self.threshold = float(config.get("ignition_threshold", 1.0))
         self.burn_duration = int(config.get("burn_duration", 12))
         self.moisture = float(config.get("moisture", 0.3))
+        self.wind_speed = float(config.get("wind_speed", 0.0))
+        # Weather coupling (#17): an explicit weather option overrides the
+        # raw wind/moisture, so identical seeds diverge documentably across
+        # weather. No weather key = raw config (legacy behavior).
+        self.weather_active = config.get("weather_active")
+        modifiers = config.get("weather_modifiers", {})
+        if self.weather_active is not None:
+            if self.weather_active not in modifiers:
+                raise ValueError(
+                    f"Unknown fire weather {self.weather_active!r} "
+                    f"(have {sorted(modifiers)})"
+                )
+            mod = modifiers[self.weather_active]
+            self.wind_speed = float(mod.get("wind_speed", self.wind_speed))
+            self.moisture = float(mod.get("moisture", self.moisture))
         self.fuel_default = float(config.get("fuel_default", 0.7))
         self.fuel_map = {
             (int(c["x"]), int(c["y"])): float(c["fuel"])
@@ -39,7 +54,6 @@ class FireModel:
         }
         wind_dir = tuple(config.get("wind_dir", [1, 0]))
         self.wind = _norm((float(wind_dir[0]), float(wind_dir[1])))
-        self.wind_speed = float(config.get("wind_speed", 0.0))
         self.ignited: dict[tuple[int, int], int] = {}
         self.exposure: dict[tuple[int, int], float] = {}
         for cell in config.get("ignition", []):
@@ -95,4 +109,9 @@ class FireModel:
         return dict(self.ignited)
 
     def snapshot(self) -> dict:
-        return {"ignited": sorted(f"{x},{y}@{s}" for (x, y), s in self.ignited.items())}
+        return {
+            "weather": self.weather_active,
+            "wind_speed": self.wind_speed,
+            "moisture": self.moisture,
+            "ignited": sorted(f"{x},{y}@{s}" for (x, y), s in self.ignited.items()),
+        }

@@ -15,6 +15,8 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from dmb.perception.edge import MOBILITY_RADIUS_FACTOR
+
 
 @dataclass
 class DroneState:
@@ -71,6 +73,9 @@ class SimBridge(ABC):
 class MockBridge(SimBridge):
     """Deterministic grid world. No external dependencies."""
 
+    # Vehicle classes the backend can honour; mismatch fails loudly at reset.
+    SUPPORTED_VEHICLE_CLASSES = frozenset({"multicopter", "fixed-wing"})
+
     def __init__(self, step_budget: int = 60, battery_drain_per_step: float = 1.0) -> None:
         self.step_budget = step_budget
         self.battery_drain = battery_drain_per_step
@@ -96,11 +101,29 @@ class MockBridge(SimBridge):
         return bridge
 
     def reset(self, metadata: dict) -> Observation:
+        from dmb.sim.assets import load_drone_spec  # noqa: PLC0415
+
+        spec_name = str(metadata.get("drone_spec", "quad_iris_class"))
+        spec = load_drone_spec(spec_name)
+        if spec.vehicle_class not in self.SUPPORTED_VEHICLE_CLASSES:
+            raise ValueError(
+                f"{type(self).__name__} cannot honour vehicle class "
+                f"{spec.vehicle_class!r} (spec {spec_name!r})"
+            )
+        self.drone_spec_name = spec_name
         grid = metadata.get("grid", {})
         self.width = int(grid.get("width", 10))
         self.height = int(grid.get("height", 10))
         self.scenario = str(metadata.get("scenario", "mock"))
         self.seed = int(metadata.get("seed", 0))
+        self._weather_active = metadata.get("weather_active")
+        # Actor schema (#19): unknown mobility fails loudly at reset.
+        for v in metadata.get("victim_placements", []):
+            if v.get("mobility", "static") not in MOBILITY_RADIUS_FACTOR:
+                raise ValueError(
+                    f"Unknown victim mobility {v.get('mobility')!r} "
+                    f"(have {sorted(MOBILITY_RADIUS_FACTOR)})"
+                )
         self.victims = [Victim(**v) for v in metadata.get("victim_placements", [])]
         self.hazards = list(metadata.get("hazards", []))
         self.phases = list(metadata.get("difficulty", {}).get("phases", []))
@@ -129,9 +152,31 @@ class MockBridge(SimBridge):
         from dmb.physics.terrain import SlipModel  # noqa: PLC0415
         from dmb.physics.water import WaterModel  # noqa: PLC0415
 
-        self._fire = FireModel(config["fire"], self.width, self.height) if "fire" in config else None
-        self._water = WaterModel(config["water"], self.width, self.height) if "water" in config else None
-        self._slip = SlipModel(config["terrain"], self.width, self.height) if "terrain" in config else None
+        # Unknown dynamics keys fail loudly: a typo'd block must never
+        # silently disable a disaster's physics.
+        unknown = set(config) - {"fire", "water", "terrain"}
+        if unknown:
+            raise ValueError(f"Unknown dynamics blocks: {sorted(unknown)}")
+
+        def _block(name: str) -> dict | None:
+            if name not in config:
+                return None
+            block = dict(config[name])
+            if self._weather_active is not None:
+                block["weather_active"] = self._weather_active
+            return block
+
+        fire_cfg = _block("fire")
+        self._fire = FireModel(fire_cfg, self.width, self.height) if fire_cfg else None
+        self._water = (
+            WaterModel(config["water"], self.width, self.height)
+            if "water" in config
+            else None
+        )
+        terrain_cfg = _block("terrain")
+        self._slip = (
+            SlipModel(terrain_cfg, self.width, self.height) if terrain_cfg else None
+        )
         self._danger: dict[tuple[int, int], int] = {}
         if self._fire is not None:
             self._danger.update(self._fire.danger_steps())
@@ -367,6 +412,9 @@ class GazeboSITLBridge(MockBridge):
     coordinates come from scenario metadata, found when the drone's real
     position is within radius. Camera perception arrives with watcher T2.
     """
+
+    # Runs ArduCopter SITL + the iris Gazebo world: multicopters only.
+    SUPPORTED_VEHICLE_CLASSES = frozenset({"multicopter"})
 
     def __init__(
         self,

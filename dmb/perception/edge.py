@@ -10,6 +10,7 @@ resource-scarce deployments.
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -36,6 +37,23 @@ class TriggerConfig:
     heartbeat_every_steps: int = 5
     report_on_novelty: bool = True
     detection_radius: float = 3.0
+
+
+# Detectability by actor mobility (#19): trapped victims show less surface,
+# buried victims only at close range with low confidence. Documented in
+# docs/physics-assets.md; T1 backends implement the same profile.
+MOBILITY_RADIUS_FACTOR = {
+    "static": 1.0,
+    "mobile": 1.0,
+    "trapped": 0.75,
+    "buried": 1.0 / 3.0,
+}
+MOBILITY_CONFIDENCE = {
+    "static": 0.9,
+    "mobile": 0.9,
+    "trapped": 0.7,
+    "buried": 0.5,
+}
 
 
 class FrameBudget:
@@ -87,13 +105,19 @@ class StubEdgePerception(EdgePerception):
         if not self.bridge.drone.airborne:
             return detections, novel
         for victim in self.bridge.victims_within(self.config.detection_radius):
+            factor = MOBILITY_RADIUS_FACTOR.get(victim.mobility, 1.0)
+            dist = math.hypot(
+                victim.x - self.bridge.drone.x, victim.y - self.bridge.drone.y
+            )
+            if dist > self.config.detection_radius * factor:
+                continue
             vid = id(victim)
             detections.append(
                 Detection(
                     label=victim.category,
                     x=victim.x,
                     y=victim.y,
-                    confidence=0.9,
+                    confidence=MOBILITY_CONFIDENCE.get(victim.mobility, 0.9),
                 )
             )
             if vid not in self._known_ids:
