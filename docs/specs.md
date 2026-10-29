@@ -108,6 +108,8 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
   (recall 0.5/0.5/0.6 both backends, zero diffs). Track 2 API-faithful.
 - 2026-10-29: #16 done; T2 Colosseum (record+keyframes) + Gazebo
   (record-path/playback, live) + T3 HTML + registry evidence + L2 audit.
+- 2026-10-29: #7 done; 4-column pack matrix (spark 0.755, heuristic
+  0.704, random 0.638, qwen-7b 0.535*); scripted coverage beats the 7B LM.
 - 2026-10-29: Track 2 live (#6): Blocks binary runs on the PC, hello
   flight green (arm/takeoff/goto/land + native 256x144 frame), verdict
   mock-vs-Colosseum 3/3 match (forest_fire seeds 1-3, recall 0.0=0.0).

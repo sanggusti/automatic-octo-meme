@@ -184,6 +184,7 @@ def main() -> None:
     table.add_argument("--runs", default="runs")
     table.add_argument("--out", required=True)
     table.add_argument("--csv", default=None)
+    table.add_argument("--run", action="append", default=[], help="Only include these run ids (repeatable).")
     args = parser.parse_args()
     if args.command == "record":
         print(
@@ -197,6 +198,8 @@ def main() -> None:
         )
     else:
         rows = _load_rows(Path(args.runs))
+        if args.run:
+            rows = [r for r in rows if r["run_id"] in set(args.run)]
         Path(args.out).write_text(render_markdown(rows))
         print(f"{len(rows)} samples -> {args.out}")
         if args.csv:
