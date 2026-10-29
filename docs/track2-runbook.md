@@ -1,6 +1,7 @@
 # Track 2 Runbook — Colosseum on the GPU Workstation
 
-Runs on the operator PC (RTX 5070 Ti), not the dev machine. Versions pinned
+Runs on the operator PC (RTX 5060 Ti 16 GB, corrected 2026-10-29 from
+the 5070 Ti inventory guess), not the dev machine. Versions pinned
 from the Colosseum README (inspected 2026-10-28): **main branch = UE 5.6**,
 Windows 10 supported; Ubuntu 22.04 has a Vulkan caveat (Docker advised).
 
@@ -87,11 +88,21 @@ from dmb.sim.bridge import MockBridge
 from dmb.sim.colosseum_bridge import ColosseumBridge
 from dmb.verdicts import compare_backends
 
-def rollout(bridge):
-    bridge.act("arm", {})
-    bridge.act("takeoff", {"altitude_m": 10})
-    bridge.act("goto", {"x": 2, "y": 2})
-    bridge.act("land", {})
+def rollout(bridge, meta):
+    from dmb.perception.edge import FrameBudget, StubEdgePerception, TriggerConfig
+
+    edge = StubEdgePerception(bridge, TriggerConfig(), FrameBudget(8))
+
+    def do(action, params=None):
+        obs = bridge.act(action, params or {})
+        edge.on_step(bridge.get_state()["steps"])
+        return obs
+
+    do("arm")
+    do("takeoff", {"altitude_m": 10})
+    for victim in meta["victim_placements"][:2]:
+        do("goto", {"x": victim["x"], "y": victim["y"]})
+    do("land")
 
 metas = [dict(s.metadata) for s in build_samples("forest_fire", seeds=[1, 2, 3])]
 report = compare_backends(
@@ -101,9 +112,14 @@ report = compare_backends(
 )
 for entry in report:
     print(entry["seed"], entry["match"], entry["diffs"])
+    for label, scores in entry["scores"].items():
+        print("  ", label, {k: round(scores[k], 3) for k in ("rescue_recall", "safety", "found_any")})
 ```
 
-All-match is the bar. Mismatches are data: record diffs in issue #6.
+All-match is the bar AND the rollout must find victims on mock
+(recall > 0): a 0.0=0.0 match is vacuous and does not clear the bar
+(2026-10-29 run matched 0.0=0.0 — re-run required with this rollout).
+Mismatches are data: record diffs in issue #6.
 
 ## 5. Notes
 
