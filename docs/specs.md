@@ -91,3 +91,5 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-28: Phase D done; L2 recorder + SFT/RLVR export, 224-pair
   teacher set, LoRA finetune on Modal, held-out delta −0.049 (null;
   scan-spam mechanism), dataset + weights on HF; suite 50+ green.
+- 2026-10-29: Baseten verified (muse-spark-open-1026, key scoped to that
+  slug); smoke 1.0, forest_fire 0.608, pack 0.755 (18/18). #1 closed.
