@@ -135,17 +135,31 @@ def test_colosseum_capture_frame_native_bytes():
     assert img.size == (32, 32)  # fake native bytes, not the rendered map
 
 
-def _short_rollout(bridge):
-    bridge.act("arm", {})
-    bridge.act("takeoff", {"altitude_m": 10})
-    bridge.act("goto", {"x": 2, "y": 2})
-    bridge.act("land", {})
+def _finding_rollout(bridge, meta):
+    from dmb.perception.edge import FrameBudget, StubEdgePerception, TriggerConfig
+
+    edge = StubEdgePerception(bridge, TriggerConfig(), FrameBudget(8))
+
+    def do(action, params=None):
+        obs = bridge.act(action, params or {})
+        edge.on_step(bridge.get_state()["steps"])
+        return obs
+
+    do("arm")
+    do("takeoff", {"altitude_m": 10})
+    for victim in meta["victim_placements"][:2]:
+        do("goto", {"x": victim["x"], "y": victim["y"]})
+    do("land")
 
 
 def test_verdict_mock_vs_mock_matches():
     metas = [dict(s.metadata) for s in build_samples("forest_fire", seeds=[1, 2])]
     report = compare_backends(
-        MockBridge.from_metadata, MockBridge.from_metadata, metas, _short_rollout
+        MockBridge.from_metadata, MockBridge.from_metadata, metas, _finding_rollout
     )
     assert len(report) == 2
     assert all(entry["match"] for entry in report), report
+    # Non-vacuous: the finding rollout must actually find victims on mock.
+    assert all(
+        entry["scores"]["a"]["rescue_recall"] > 0 for entry in report
+    ), report

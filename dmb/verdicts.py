@@ -29,14 +29,14 @@ def compare_scores(a: dict, b: dict) -> dict:
 
 
 def compare_backends(make_a, make_b, metadatas: list[dict], rollout) -> list[dict]:
-    """Run `rollout(bridge)` on both backends per sample; compare verdicts."""
+    """Run `rollout(bridge, metadata)` on both backends per sample; compare."""
     report = []
     for metadata in metadatas:
         states = {}
         for label, make in (("a", make_a), ("b", make_b)):
             bridge = make(dict(metadata))
             try:
-                rollout(bridge)
+                rollout(bridge, dict(metadata))
                 states[label] = bridge.get_state()
             finally:
                 bridge.close()

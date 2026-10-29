@@ -4,8 +4,9 @@
 
 - **Dev machine** (this repo): Apple Silicon Mac, no discrete GPU. Runs the
   harness, mock evals, unit tests, docs, and issue/PR workflow.
-- **GPU workstation** (operator PC): RTX 5070 Ti, 16 GB VRAM. Target for the
-  Unreal/Colosseum fidelity track.
+- **GPU workstation** (operator PC): RTX 5060 Ti, 16 GB VRAM (nvidia-smi
+  2026-10-29; earlier docs said 5070 Ti). Target for the Unreal/Colosseum
+  fidelity track.
 - **Inference providers**: Baseten (paid hosted models), Modal (custom
   vLLM-served models). All LM inference is offloaded; nothing large runs
   locally.
