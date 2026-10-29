@@ -3,9 +3,9 @@
 Ordered workstreams; each owns a GitHub issue. Dependencies flow top-down.
 Status as of 2026-10-27 in brackets.
 
-1. **Inference spike** (#1) — first verified Baseten + Modal runs through the
-   smoke and forest-fire tasks. [partial 2026-10-27: Modal verified, deployment
-   stopped; Baseten still blocked on credits] Unblocks all real-model work.
+1. **Inference spike** (#1) [done 2026-10-29: Baseten muse-spark-open-1026
+   verified (smoke 1.0, forest_fire 0.608); Modal half done 2026-10-27] —
+   first verified Baseten + Modal runs. Unblocks all real-model work.
 2. **Sim spike (Track 1)** (#2) [done 2026-10-27: image, bridge, flight
    proofs, 2-parallel isolation] — pinned image builds; SITL+Gazebo boots;
    scripted GUIDED takeoff/hover/land; MAVLink message set documented;
@@ -20,7 +20,9 @@ Status as of 2026-10-27 in brackets.
 6. **Fidelity track (Track 2)** (#6) — Colosseum/Unreal on the GPU workstation,
    `ColosseumBridge`, one parported scenario.
 7. **Baseline sweep** (#7) — 2–3 Baseten models + 1 Modal custom model over the
-   full scenario pack; first published results table. [blocked on #1, #4]
+   full scenario pack; first published results table. [partial 2026-10-29:
+   muse-spark-open-1026 pack 0.755 tabled in issue; key scoped to that slug,
+   more models + Modal side still open; #1 unblocked, #4 still open]
 8. **Results aggregation** (#8) — `runs/*/scores.json` → tables/plots script.
 9. **Tsunami scenario** (#15) — task wiring + phase dynamics + golden scores.
 10. **Scenario watcher** (#16) — L2 event log, T1 replay CLI, T2 backend

@@ -13,9 +13,15 @@ Verified against the installed inspect-ai provider: model id
   `dmb.models.baseten_model_id`)
 - Requirements for mission evals: the slug must support **tool calling**
   (all Model APIs do) and **vision** (model-specific — confirm per slug).
-- Status: **blocked — credits pending** (operator action). Pick the slug at
-  credit time and record it in `docs/specs.md`.
-- Example: `inspect eval evals/forest_fire.py --model openai-api/baseten/<slug>`
+- Status: **verified 2026-10-29** with `meta-models/muse-spark-open-1026`
+  (tool calling + vision + reasoning tokens confirmed live). Key is scoped
+  to that slug only — other slugs need their own grant.
+- Verified: smoke 1.0; forest_fire limit-1 0.608 (24 tool calls, full
+  recall, image blocks in transcript); full 6-scenario pack 0.755
+  (18/18, ~380k in / 78k out tokens + 1.6M cache reads; $ cost per
+  operator's Baseten plan).
+- Example: `inspect eval evals/forest_fire.py --model
+  openai-api/baseten/meta-models/muse-spark-open-1026`
 
 ## Modal (custom models)
 
