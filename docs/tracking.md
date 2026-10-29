@@ -25,5 +25,16 @@
 ## Reading results
 
 - Single run: `inspect view` on the `.eval` log.
-- Across runs: aggregate `runs/*/scores.json` (aggregation script is a
-  roadmap item; until then, small ad-hoc scripts, kept with the analysis).
+- Across runs: `dmb/aggregate.py` (#8). Record each run once, then render:
+
+```bash
+python -m dmb.aggregate record --run-id <id> --task <task> --model <model-id> \
+  --scenario <name-or-pack> --log <run.eval> [--note ...]
+python -m dmb.aggregate table --runs runs --out table.md [--csv out.csv]
+```
+
+`record` writes `runs/<id>/{config.json,scores.json}` from the .eval
+(per-sample vectors + eval-log pointer); `table` renders a
+model×scenario markdown table (mean±std composite + full vector means,
+pasteable into issues) and a per-sample CSV. Backfilled: `baseten-pack`,
+`flytest-base`, `flytest-ft` (reproduces the posted #7 + flywheel numbers).
