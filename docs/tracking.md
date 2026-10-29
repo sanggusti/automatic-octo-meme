@@ -29,7 +29,8 @@
 
 ```bash
 python -m dmb.aggregate record --run-id <id> --task <task> --model <model-id> \
-  --scenario <name-or-pack> --log <run.eval> [--note ...]
+  --scenario <name-or-pack> --log <run.eval> [--note ...] \
+  [--l2-dir runs/<id>/trajectories --l3-dir runs/<id>/sim]
 python -m dmb.aggregate table --runs runs --out table.md [--csv out.csv]
 ```
 

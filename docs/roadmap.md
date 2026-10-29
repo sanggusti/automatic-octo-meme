@@ -33,8 +33,9 @@ Status as of 2026-10-27 in brackets.
    3 runs backfilled, reproduces posted numbers] — `runs/*/scores.json` →
    tables/plots script.
 9. **Tsunami scenario** (#15) — task wiring + phase dynamics + golden scores.
-10. **Scenario watcher** (#16) — L2 event log, T1 replay CLI, T2 backend
-    capture, T3 composite design.
+10. **Scenario watcher** (#16) [done 2026-10-29: L2+T1, all T2 legs,
+    T3 HTML, registry evidence links, L2 audit] — L2 event log, T1 replay
+    CLI, T2 backend capture, T3 composite.
 11. **Asset pack: vegetation + fire** (#17) [done 2026-10-29: fire weather
     coupling + tolerance bands, Fuel tree pins + placement script, T2 plan].
 12. **Asset pack: terrain + water** (#18) [done 2026-10-29: slip weather

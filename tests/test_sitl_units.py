@@ -27,3 +27,25 @@ def test_backend_selection():
     assert _bridge_for_backend("gazebo-sitl") is GazeboSITLBridge
     with pytest.raises(ValueError):
         _bridge_for_backend("colosseum")  # not via this switch yet
+
+
+def test_docker_args_mount_record_by_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("DMB_L3_DIR", str(tmp_path / "sim"))
+    monkeypatch.delenv("DMB_L3", raising=False)
+    bridge = GazeboSITLBridge.__new__(GazeboSITLBridge)
+    bridge._partition = "dmb-test"
+    bridge._sample_id = "s-1"
+    bridge.image = "dmb/sim:track1"
+    args = GazeboSITLBridge._docker_run_args(bridge)
+    assert "-v" in args and "DMB_GZ_RECORD_PATH=/record" in args
+    assert (tmp_path / "sim" / "s-1").exists()
+
+
+def test_docker_args_skip_record_when_l3_off(tmp_path, monkeypatch):
+    monkeypatch.setenv("DMB_L3", "off")
+    bridge = GazeboSITLBridge.__new__(GazeboSITLBridge)
+    bridge._partition = "dmb-test"
+    bridge.image = "dmb/sim:track1"
+    args = GazeboSITLBridge._docker_run_args(bridge)
+    assert "-v" not in args
+    assert "DMB_GZ_RECORD_PATH=/record" not in args

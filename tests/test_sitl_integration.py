@@ -73,3 +73,30 @@ def test_verdict_mock_vs_sitl_short_rollout():
     )
     assert len(report) == 1
     assert report[0]["match"], report[0]["diffs"]
+
+
+@needs_sitl
+def test_sitl_records_gz_log(tmp_path, monkeypatch):
+    monkeypatch.setenv("DMB_L3_DIR", str(tmp_path / "sim"))
+    monkeypatch.delenv("DMB_L3", raising=False)
+    meta = dict(build_samples("forest_fire", seeds=[1])[0].metadata)
+    meta["sample_id"] = "forest_fire-seed-1"
+    bridge = GazeboSITLBridge()
+    try:
+        bridge.reset(meta)
+        bridge.act("arm", {})
+        bridge.act("takeoff", {"altitude_m": 5})
+        bridge.act("land", {})
+    finally:
+        bridge.close()
+    # Writers flush on process exit; poll briefly for the log files.
+    import time
+
+    sim_dir = tmp_path / "sim" / "forest_fire-seed-1"
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        if any(sim_dir.rglob("*.tlog")):
+            break
+        time.sleep(5)
+    found = list(sim_dir.rglob("*.tlog")) if sim_dir.exists() else []
+    assert found, f"no .tlog under {sim_dir}"

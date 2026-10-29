@@ -127,3 +127,44 @@ def test_render_rejects_hash_mismatch(tmp_path):
          "scenario": "forest_fire", "seed": 1, "world_hash": "deadbeef"}) + "\n")
     with pytest.raises(ValueError, match="world_hash mismatch"):
         render(src, tmp_path / "replays")
+
+
+def test_l3_paths_link_beside_trajectories(tmp_path, monkeypatch):
+    from dmb.watch.l3 import l3_enabled, l3_sample_dir
+
+    monkeypatch.setenv("DMB_WATCH_DIR", str(tmp_path / "runs" / "r1" / "trajectories"))
+    monkeypatch.delenv("DMB_L3", raising=False)
+    assert l3_enabled()
+    path = l3_sample_dir("s-1")
+    assert path == tmp_path / "runs" / "r1" / "sim" / "s-1"
+    assert path.exists()
+    monkeypatch.setenv("DMB_L3", "off")
+    assert not l3_enabled()
+
+
+def test_compose_renders_all_layers(tmp_path):
+    from types import SimpleNamespace
+
+    from dmb.watch.compose import collect_artifacts, render_html, transcript_turns
+
+    user = SimpleNamespace(role="user", content="brief")
+    turn = SimpleNamespace(
+        role="assistant", content="arming now",
+        tool_calls=[SimpleNamespace(function="arm", arguments={})],
+    )
+    tool = SimpleNamespace(role="tool", tool_call_id="c1", content="Armed")
+    turns = transcript_turns([user, turn, tool])
+    assert [t["role"] for t in turns] == ["user", "assistant", "tool"]
+    assert turns[1]["tool_calls"][0]["name"] == "arm"
+
+    l3 = tmp_path / "s-1"
+    l3.mkdir(parents=True)
+    (l3 / "final.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 100)
+    (l3 / "notes.txt").write_text("ignored")
+    arts = collect_artifacts(l3)
+    assert len(arts) == 1 and arts[0]["data_uri"].startswith("data:image/png;base64,")
+
+    page = render_html(
+        "Replay: s-1", turns, ["[t=0] action arm()"], {"composite": 0.5}, arts
+    )
+    assert "composite=0.500" in page and "arm(" in page and "data:image/png" in page

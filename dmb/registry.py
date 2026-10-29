@@ -48,6 +48,7 @@ class RunRecord:
     git_sha: str | None = None
     eval_logs: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    evidence: dict[str, str] = field(default_factory=dict)
 
 
 class RunRegistry:

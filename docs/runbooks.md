@@ -54,6 +54,19 @@ Human baseline mission (blind; scored + recorded like any run):
 .venv/bin/python -m dmb.human_cli --scenario forest_fire --seed 1 --name <you>
 ```
 
+## Replay
+
+```bash
+# T1 narrative + T2 mock render + T3 composite page for one episode:
+.venv/bin/python -m dmb.watch.replay runs/<id>/trajectories/<sample>.jsonl
+.venv/bin/python -m dmb.watch.render runs/<id>/trajectories/<sample>.jsonl --out runs/<id>/sim/<sample>
+.venv/bin/python -m dmb.watch.compose --eval <run.eval> --sample <sample> \
+  --l2 runs/<id>/trajectories --l3 runs/<id>/sim --out runs/<id>/sim/<sample>.html
+# T2 Gazebo state-log playback (inside the sim image; Mac has no host gz):
+docker run --rm -e GZ_PARTITION=replay -v $PWD/runs/<id>/sim/<sample>:/rec \
+  --entrypoint gz dmb/sim:track1 sim --playback /rec/gzlog -s
+```
+
 ## Troubleshooting
 
 | Symptom | Fix |
