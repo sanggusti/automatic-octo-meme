@@ -55,14 +55,14 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 | Isolation | 1 container (1 SITL + 1 Gazebo) per episode, random host port |
 | Grid mapping | 5 m/cell, east=+x, north=+y from GPS home anchor |
 
-## Track 2 sim (code done in #27; live run owned by #6)
+## Track 2 sim (code done in #27; live leg verified 2026-10-29 for #6)
 
 | Item | Spec |
 |---|---|
-| Engine/sim | Colosseum (`CodexLabsLLC/Colosseum`, AirSim successor) on Unreal |
-| Versions | UE 5.6 (main branch), Windows 10; Ubuntu 22.04 Vulkan caveat |
-| Workstation | Operator PC, RTX 5070 Ti 16 GB VRAM |
-| Client API | msgpack-rpc 127.0.0.1:41451; takeoff/land/goHome/moveToPosition/hover/simGetImages verified in client source |
+| Engine/sim | Colosseum (`CodexLabsLLC/Colosseum`, AirSim successor) on Unreal; env binary `Blocks.zip` from release `v2.0.0-beta` (2023-02-27) |
+| Versions | Source `main` @ `c2703d0ccd15d5e72911461af0d064e671c8a29d` (2025-12-08, UE 5.6-only per README); binary UE 5.1; wire client `v2.0.0-beta` @ `7b9658a1169705ca86b21b3518fac5ba83fbe183` |
+| Workstation | This PC: RTX 5060 Ti 16 GB (nvidia-smi; inventory said 5070 Ti), Windows 11 26H2, Python 3.12.10 venv, airsim 1.8.1 (beta client) |
+| Client API | msgpack-rpc 127.0.0.1:41451; reset/enableApiControl/armDisarm/takeoff/land/goHome/moveToPosition/hover/simGetVehiclePose/getMultirotorState/simGetImages verified live. Main-branch client cannot parse this binary's MultirotorState — use the beta client |
 | Grid mapping | Local NED metres around spawn (east=+x, north=+y), 5 m/cell |
 | Isolation | 1 session per sample |
 
@@ -102,3 +102,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-29: #4 done; bands documented, time-of-day axis + edge
   visibility, per-kind containment (tsunami beat-the-wave), efficiency
   idle fix (0.3→0.15), exposure metrics; suite 74 green.
+- 2026-10-29: Track 2 live (#6): Blocks binary runs on the PC, hello
+  flight green (arm/takeoff/goto/land + native 256x144 frame), verdict
+  mock-vs-Colosseum 3/3 match (forest_fire seeds 1-3, recall 0.0=0.0).
