@@ -33,9 +33,10 @@ def drone_mission() -> Solver:
         spec_name = str(dict(state.metadata).get("drone_spec", "quad_iris_class"))
         assert_mission_capable(load_drone_spec(spec_name))
         bridge = _bridge_for_backend(backend).from_metadata(dict(state.metadata))
+        tod = dict(state.metadata).get("time_of_day_active") or "day"
         edge = StubEdgePerception(
             bridge,
-            TriggerConfig(),
+            TriggerConfig(time_of_day=str(tod)),
             FrameBudget(max_snapshots=8),
         )
         watcher = watcher_from_env(str(state.sample_id))

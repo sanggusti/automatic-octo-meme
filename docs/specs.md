@@ -99,3 +99,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-29: Asset credibility bundle (#3/#17/#18/#19): sourced drone
   specs + enforcement, fire/terrain weather coupling, mobility
   detectability, Fuel pins + manifest, T1/T2 plans; suite 66 green.
+- 2026-10-29: #4 done; bands documented, time-of-day axis + edge
+  visibility, per-kind containment (tsunami beat-the-wave), efficiency
+  idle fix (0.3→0.15), exposure metrics; suite 74 green.

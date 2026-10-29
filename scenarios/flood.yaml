@@ -27,6 +27,11 @@ weather:
   - overcast
   - rain-light
   - clear
+time_of_day:
+  - dawn
+  - day
+  - dusk
+  - night
 difficulty:
   visibility: medium
   victim_mobility: static

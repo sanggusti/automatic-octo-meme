@@ -339,6 +339,7 @@ class MockBridge(SimBridge):
         return {
             "scenario": self.scenario,
             "seed": self.seed,
+            "grid": {"width": self.width, "height": self.height},
             "steps": self.steps,
             "sim_time": self.sim_time,
             "step_budget": self.step_budget,
@@ -367,8 +368,30 @@ class MockBridge(SimBridge):
                 for v in self.victims
             ],
             "hazards": self.hazards,
+            "phases": self.phases,
             "cell_danger": {f"{x},{y}": s for (x, y), s in self._danger.items()},
+            "dynamics": self._dynamics_summary(),
         }
+
+    def _dynamics_summary(self) -> dict:
+        """Light per-model counts for per-kind containment (#4)."""
+        summary: dict = {}
+        fire = getattr(self, "_fire", None)
+        water = getattr(self, "_water", None)
+        slip = getattr(self, "_slip", None)
+        if fire is not None:
+            summary["fire"] = {
+                "ignited_cells": len(fire.ignited),
+                "burned_cells": len(fire.burned_cells(self.steps)),
+            }
+        if water is not None:
+            summary["water"] = {"flooded_cells": len(water._flooded)}
+        if slip is not None:
+            summary["terrain"] = {
+                "debris_cells": len(slip.debris_cells),
+                "slip_step": slip.slip_step if slip.slip_step is not None else -1,
+            }
+        return summary
 
     def close(self) -> None:
         return None

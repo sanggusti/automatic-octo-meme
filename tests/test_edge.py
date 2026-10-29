@@ -69,3 +69,38 @@ def test_mobility_detectability_profile():
     detections, _ = edge._scan()
     buried = [d for d in detections if (d.x, d.y) == (2, 1)][0]
     assert buried.confidence == MOBILITY_CONFIDENCE["buried"]
+
+
+def test_time_of_day_shrinks_radius():
+    import pytest
+
+    from dmb.perception.edge import (
+        FrameBudget,
+        StubEdgePerception,
+        TriggerConfig,
+    )
+    from dmb.sim.bridge import MockBridge
+
+    def scan_at(tod):
+        bridge = MockBridge()
+        bridge.reset(
+            {
+                "scenario": "mock",
+                "seed": 0,
+                "grid": {"width": 10, "height": 10},
+                "victim_placements": [
+                    {"category": "human", "x": 2, "y": 0, "mobility": "static"}
+                ],
+                "hazards": [],
+            }
+        )
+        bridge.drone.airborne = True
+        edge = StubEdgePerception(
+            bridge, TriggerConfig(time_of_day=tod), FrameBudget(max_snapshots=8)
+        )
+        return edge._scan()[0]
+
+    assert len(scan_at("day")) == 1
+    assert len(scan_at("night")) == 0  # dist 2.0 > 3.0 * 0.5
+    with pytest.raises(ValueError, match="Unknown time_of_day"):
+        scan_at("eclipse")

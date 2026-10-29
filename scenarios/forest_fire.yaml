@@ -28,6 +28,11 @@ weather:
   - haze-heavy
   - haze-moderate
   - clear
+time_of_day:
+  - dawn
+  - day
+  - dusk
+  - night
 difficulty:
   visibility: low
   victim_mobility: static

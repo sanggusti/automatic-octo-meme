@@ -28,6 +28,11 @@ weather:
   - storm
   - rain-heavy
   - rain-light
+time_of_day:
+  - dawn
+  - day
+  - dusk
+  - night
 difficulty:
   visibility: medium
   victim_mobility: static

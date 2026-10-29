@@ -35,26 +35,13 @@ def compute_mission_scores(final_state: dict, tool_calls: int) -> dict[str, floa
 
     steps = float(final_state.get("steps", 0) or 0)
     budget = float(final_state.get("step_budget", 0) or 0)
-    efficiency = max(0.0, 1.0 - (steps / budget)) if budget else 0.0
+    found_any = any(v.get("found") for v in victims)
+    # Idle-episode fix (#4): doing nothing scores efficiency 0, not 1.
+    efficiency = (max(0.0, 1.0 - (steps / budget)) if budget else 0.0) if found_any else 0.0
     violations = int(final_state.get("safety_violations", 0))
     safety = 1.0 if violations == 0 else max(0.0, 1.0 - 0.25 * violations)
 
-    # Damage containment: weighted fraction of victims found BEFORE their
-    # cell became dangerous (beat-the-spread), times safety. Without
-    # dynamics every danger step is infinite, reducing to recall * safety.
-    cell_danger = final_state.get("cell_danger", {})
-    beaten_weight = 0.0
-    for v in victims:
-        if not v.get("found"):
-            continue
-        found_step = v.get("found_step", -1)
-        if found_step < 0:
-            beaten_weight += VICTIM_WEIGHTS.get(v.get("category", ""), 0.0)
-            continue
-        danger = cell_danger.get(f"{v.get('x')},{v.get('y')}", float("inf"))
-        if found_step <= danger:
-            beaten_weight += VICTIM_WEIGHTS.get(v.get("category", ""), 0.0)
-    beat = (beaten_weight / total_weight) if total_weight else 1.0
+    beat = _containment_beat(final_state, victims, total_weight)
     containment = max(0.0, min(1.0, beat * safety))
 
     composite = 0.5 * rescue_recall + 0.2 * containment + 0.15 * efficiency + 0.15 * safety
@@ -65,10 +52,73 @@ def compute_mission_scores(final_state: dict, tool_calls: int) -> dict[str, floa
         "efficiency": efficiency,
         "safety": safety,
         "tool_calls": float(tool_calls),
-        "found_any": 1.0 if any(v.get("found") for v in victims) else 0.0,
+        "found_any": 1.0 if found_any else 0.0,
         "first_find_step": float(final_state.get("first_find_step", -1)),
         "coverage": float(final_state.get("coverage", 0.0)),
+        **_exposure_metrics(final_state, victims),
         "composite": composite,
+    }
+
+
+def _cell_beat(victims: list, total_weight: float, cell_danger: dict) -> float:
+    """Weighted fraction found before their cell became dangerous."""
+    beaten = 0.0
+    for v in victims:
+        if not v.get("found"):
+            continue
+        found_step = v.get("found_step", -1)
+        if found_step < 0:
+            beaten += VICTIM_WEIGHTS.get(v.get("category", ""), 0.0)
+            continue
+        danger = cell_danger.get(f"{v.get('x')},{v.get('y')}", float("inf"))
+        if found_step <= danger:
+            beaten += VICTIM_WEIGHTS.get(v.get("category", ""), 0.0)
+    return (beaten / total_weight) if total_weight else 1.0
+
+
+def _containment_beat(final_state: dict, victims: list, total_weight: float) -> float:
+    """Per-kind containment beat (#4), before the safety multiplier.
+
+    - tsunami: beat-the-wave — found before the wave-arrival phase starts.
+    - fire / water / terrain kinds: beat-the-spread on cell danger steps.
+    - no dynamics (earthquake): every danger is infinite, reducing to recall.
+    """
+    if final_state.get("scenario") == "tsunami":
+        # Beat-the-wave: found before the wave-arrival phase STARTS, i.e.
+        # before the previous phase's until_step.
+        deadline = None
+        prev_until = 0
+        for phase in final_state.get("phases", []):
+            if phase.get("name") == "wave-arrival":
+                deadline = prev_until
+                break
+            prev_until = int(phase.get("until_step", 0))
+        if deadline is not None:
+            beaten = sum(
+                VICTIM_WEIGHTS.get(v.get("category", ""), 0.0)
+                for v in victims
+                if v.get("found") and 0 <= v.get("found_step", -1) < deadline
+            )
+            return (beaten / total_weight) if total_weight else 1.0
+    return _cell_beat(victims, total_weight, final_state.get("cell_danger", {}))
+
+
+def _exposure_metrics(final_state: dict, victims: list) -> dict[str, float]:
+    """Informational (not in composite): how big the disaster got."""
+    grid = final_state.get("grid", {})
+    cells = max(1, int(grid.get("width", 10)) * int(grid.get("height", 10)))
+    dynamics = final_state.get("dynamics", {})
+    fire = dynamics.get("fire", {})
+    water = dynamics.get("water", {})
+    terrain = dynamics.get("terrain", {})
+    return {
+        "damage_cells": float(len(final_state.get("cell_danger", {}))),
+        "unburned_fraction": 1.0 - fire.get("ignited_cells", 0) / cells,
+        "unflooded_fraction": 1.0 - water.get("flooded_cells", 0) / cells,
+        "debris_cells": float(terrain.get("debris_cells", 0)),
+        "buried_victims": float(
+            sum(1 for v in victims if v.get("mobility") == "buried")
+        ),
     }
 
 
