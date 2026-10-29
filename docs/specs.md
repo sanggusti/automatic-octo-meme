@@ -102,6 +102,8 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-29: #4 done; bands documented, time-of-day axis + edge
   visibility, per-kind containment (tsunami beat-the-wave), efficiency
   idle fix (0.3→0.15), exposure metrics; suite 74 green.
+- 2026-10-29: #8 done; record (eval→registry) + table (registry→md/CSV)
+  CLIs, 3 runs backfilled, output reproduces posted #7/flywheel tables.
 - 2026-10-29: Track 2 live (#6): Blocks binary runs on the PC, hello
   flight green (arm/takeoff/goto/land + native 256x144 frame), verdict
   mock-vs-Colosseum 3/3 match (forest_fire seeds 1-3, recall 0.0=0.0).

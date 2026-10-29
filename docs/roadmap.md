@@ -27,7 +27,9 @@ Status as of 2026-10-27 in brackets.
    baselines over the full scenario pack; first published results table.
    [partial 2026-10-29: muse-spark-open-1026 pack 0.755 tabled; single-slug
    scope locked — breadth via Modal/human/baselines; #1 unblocked]
-8. **Results aggregation** (#8) — `runs/*/scores.json` → tables/plots script.
+8. **Results aggregation** (#8) [done 2026-10-29: record + table CLIs,
+   3 runs backfilled, reproduces posted numbers] — `runs/*/scores.json` →
+   tables/plots script.
 9. **Tsunami scenario** (#15) — task wiring + phase dynamics + golden scores.
 10. **Scenario watcher** (#16) — L2 event log, T1 replay CLI, T2 backend
     capture, T3 composite design.
