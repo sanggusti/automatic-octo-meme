@@ -3,6 +3,8 @@
 Six disaster types under `scenarios/`, each a YAML with: grid size, victim
 categories (`human`/`child`/`animal` with count ranges and mobility),
 hazard zones, weather options, time-of-day options, and difficulty knobs.
+`*_large` files are 20×20 variants of a base disaster (`variant_of` key);
+the pack sweep runs base disasters only, variants via their own tasks.
 
 Sample axes: `(scenario, seed)` plus optional `weather=` (dynamics
 overrides: fire wind/moisture, terrain raining) and `time_of_day=`
@@ -18,11 +20,13 @@ forest_fire 7/40/53, landslide 30/68/2, tsunami 7/56/37
 | Scenario | Kind | Grid | Notes |
 |---|---|---|---|
 | `forest_fire` | Wildfire + haze | 10×10 | Low visibility; fire-front hazards |
+| `forest_fire_large` | Wildfire + haze, large | 20×20 | Variant of `forest_fire`; 3 fire fronts |
 | `tsunami` | Coastal surge | 12×10 | Warning phases; surge + debris hazards |
 | `flash_flood` | Valley surge | 12×10 | Rising water; drifting hazards |
 | `flood` | Standing water | 14×10 | Large area; submerged power lines |
 | `earthquake` | Urban rubble | 10×10 | Trapped victims; unstable structures |
 | `landslide` | Slope debris | 10×12 | Low visibility; extending slip face |
+| `landslide_large` | Slope debris, large | 20×20 | Variant of `landslide`; 2 slip faces |
 
 ## Determinism contract
 
@@ -37,6 +41,8 @@ scale-up to 600+ tasks is #29.
 
 1. Copy an existing YAML, set the required keys (`name`, `kind`,
    `description`, `grid`, `victims`, `hazards`, `weather`, `difficulty`).
+   For a size variant of an existing disaster, add `variant_of: <base>`
+   (excluded from the pack sweep automatically).
 2. `build_samples("<name>", seeds=[...])` in a new `evals/<name>.py` task
    (or extend the shared mission solver).
 3. Register expected score ranges after the first tracked run.
