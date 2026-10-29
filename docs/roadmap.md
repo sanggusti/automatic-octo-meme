@@ -21,8 +21,10 @@ Status as of 2026-10-27 in brackets.
    containment models replacing the v0 proxy.
 5. **Recon advisor + human evals** (#5) — human-actor check, guided human-agent
    baseline tooling, first graded + baselined runs.
-6. **Fidelity track (Track 2)** (#6) — Colosseum/Unreal on the GPU workstation,
-   `ColosseumBridge`, one parported scenario.
+6. **Fidelity track (Track 2)** (#6) [done 2026-10-29: Blocks live on PC,
+   hello flight green, mock-vs-Colosseum verdict 3/3 non-vacuous] —
+   Colosseum/Unreal on the GPU workstation, `ColosseumBridge`, one
+   parported scenario.
 7. **Baseline sweep** (#7) — fixed Baseten model + Modal customs + scripted
    baselines over the full scenario pack; first published results table.
    [partial 2026-10-29: muse-spark-open-1026 pack 0.755 tabled; single-slug
