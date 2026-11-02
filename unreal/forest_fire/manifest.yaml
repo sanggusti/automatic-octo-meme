@@ -1,0 +1,39 @@
+# UE forest-fire env pins (#50), manifest-style.
+
+# Rule (docs/physics-assets.md): every external file pins URL + hash +
+# license. Entries below are either pinned (verified values in this repo)
+# or explicitly pending-operator (no invented URLs — the operator fills
+# the URL + hash at download time and this file is updated in the same PR
+# that first uses the asset).
+engine:
+  unreal:
+    version: "5.6"
+    source: Epic Games Launcher (operator install, issue #46)
+    status: required # Colosseum main supports UE 5.6 only; UE 5.8.4 on the PC cannot build it
+    license: Unreal Engine EULA (verify at install)
+sim:
+  colosseum_source:
+    url: https://github.com/CodexLabsLLC/Colosseum
+    commit: c2703d0ccd15d5e72911461af0d064e671c8a29d
+    commit_date: "2025-12-08"
+    status: pinned # matches docs/specs.md Track 2 table
+    license: see repo LICENSE (verify at checkout)
+gis:
+  # ESARBench precedent: UE5 + AirSim envs mapped from real GIS data.
+  # Reference maps (not a pin): https://huggingface.co/datasets/4amGodvzx/ESAR
+  dem_tile:
+    dataset: SRTM 30m or ALOS PALSAR 12.5m over Central Kalimantan peatland
+    status: pending-operator-download
+    license: verify at download (SRTM is US public domain; ALOS via ASF)
+  peat_extent:
+    dataset: Indonesian peatland map (BIG geoportal / Pantau Gambut)
+    status: pending-operator-download
+    license: verify at download
+art:
+  vegetation_pack:
+    source: Fab / Quixel Megascans tropical selection
+    status: pending-operator-selection
+    license: Fab Standard License (verify at acquisition)
+  fire_particles:
+    generator: Niagara systems driven by fire_schedule.json (built in-project)
+    license: generated (no external file)

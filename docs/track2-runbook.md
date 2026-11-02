@@ -174,3 +174,20 @@ Get-Process Blocks-Win64-DebugGame -ErrorAction SilentlyContinue | Stop-Process 
 `git -C <checkout> pull --ff-only` (shallow clones may need a fresh
 `git clone --depth 1` instead). Then re-run the client install line from
 §2 and the §3 hello flight to confirm the wire still matches.
+
+## 7. Forest-fire env (issue #50, operator legs)
+
+Code-complete in-repo; live legs need the #46 toolchain (UE 5.6 +
+Colosseum source build). The PC's UE 5.8.4
+(`D:\Epic Games\UE_5.8`, verified 2026-11-02) cannot build Colosseum —
+install UE 5.6 alongside, do not upgrade the env to 5.8.
+
+1. Build the map per `unreal/forest_fire/README.md` (GIS terrain →
+   foliage CSV → fire-schedule particles → before/burning variants).
+2. Package, start, and run the §3 hello flight against the burning map
+   (expect identical contract output; record frame bytes + a keyframe).
+3. Run the §4 verdict rollout on `forest_fire_peat` seeds 1–3 and post
+   the match table to #50.
+4. Capture before-variant reference keyframes (one per visual-target
+   phase in `unreal/forest_fire/VISUAL_TARGET.md`) into the issue.
+5. Update `docs/specs.md` (env binary + pins) in the closing PR.

@@ -1,0 +1,12 @@
+{
+  "SeeDocsAt": "https://codexlabsllc.github.io/Colosseum/settings/",
+  "SettingsVersion": 1.2,
+  "SimMode": "Multirotor",
+  "ApiServerPort": 41451,
+  "Vehicles": {
+    "SimpleFlight": {
+      "VehicleType": "SimpleFlight",
+      "X": 0, "Y": 0, "Z": 0
+    }
+  }
+}
