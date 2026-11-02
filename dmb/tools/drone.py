@@ -13,6 +13,20 @@ from inspect_ai.tool import ContentImage, ContentText, Tool, tool
 
 from dmb.perception.edge import EdgePerception
 from dmb.perception.frames import to_data_url
+from dmb.perception.grounding import (
+    grid_from_state,
+    pose_from_state,
+    project_mask,
+    survey_camera,
+)
+from dmb.perception.sam import SAMEdgePerception
+from dmb.perception.segmap import (
+    ASSUMED_CELL_M,
+    cost_grid,
+    format_route_map,
+    ground_concepts,
+    plan_routes,
+)
 from dmb.sim.bridge import SimBridge
 from dmb.watch.recorder import NullWatcher, Watcher
 
@@ -214,7 +228,66 @@ def make_drone_tools(
 
         return execute
 
-    for factory in (
+    @tool
+    def request_route_map():
+        async def execute():
+            """Plan ground routes from the drone to each located victim.
+
+            Captures a fresh segmentation map (consumes one snapshot of
+            the episode budget), grounds road/hazard masks to grid cells,
+            and routes around blockages. Only present with SAM
+            perception; routes to unlocated victims are never given.
+
+            Returns:
+                Rescuer-facing route text: severity, blockages, and one
+                waypoint path per located victim.
+            """
+            state = bridge.get_state()
+            steps = int(state.get("steps", 0))
+            report = edge.on_demand(steps)
+            _edge_event(report)
+            seg = edge.last_seg_map
+            if seg is None or seg.frame_size is None:
+                text = f"{report.summary} Route map: empty seg-map, no routes."
+                _action("request_route_map", {}, text)
+                return text
+            cell_m = getattr(
+                bridge, "grid_cell_m", getattr(bridge, "cell_m", None)
+            )
+            assumed = cell_m is None
+            if assumed:
+                cell_m = ASSUMED_CELL_M
+            cam = survey_camera(*seg.frame_size)
+            pose = pose_from_state(state)
+            spec = grid_from_state(state, cell_m)
+            stride = 2
+
+            def project_concept(concept: str):
+                result = seg.results.get(concept)
+                if result is None:
+                    return set()
+                cells: set[tuple[int, int]] = set()
+                for record, raster in zip(result.records, result.rasters):
+                    if raster is None:
+                        continue
+                    cells |= project_mask(record, raster, cam, pose, spec, stride)
+                return cells
+
+            road, hazard, blocked = ground_concepts(project_concept)
+            grid = cost_grid(spec.width, spec.height, road, hazard, blocked)
+            start = (int(state["drone"]["x"]), int(state["drone"]["y"]))
+            goals = [
+                (int(v["x"]), int(v["y"]))
+                for v in state.get("victims", []) if v.get("found")
+            ]
+            routes = plan_routes(grid, start, goals)
+            text = format_route_map(seg, routes, start, cell_m, assumed)
+            _action("request_route_map", {}, text)
+            return text
+
+        return execute
+
+    factories = [
         arm,
         takeoff,
         goto_location,
@@ -223,6 +296,9 @@ def make_drone_tools(
         return_to_launch,
         get_telemetry,
         request_edge_report,
-    ):
+    ]
+    if isinstance(edge, SAMEdgePerception):
+        factories.append(request_route_map)
+    for factory in factories:
         tools.append(factory())
     return tools

@@ -41,6 +41,9 @@ and keeps LM scores about decisions, not detector quality.
 
 - `dmb/perception/edge.py`: `EdgePerception` ABC, `TriggerConfig`,
   `FrameBudget`, `StubEdgePerception` (rule-based over `MockBridge` state).
+- `dmb/perception/sam.py`: `SAMEdgePerception` — SAM 3.1 seg-maps
+  (masks → route blockages + severity, same triggers/budget; native
+  frames only, see [sam-segmap](sam-segmap.md)).
 - Real backends implement the same interface with an on-device model; trigger
   semantics and budget accounting do not change.
 - Snapshots are referenced by `frame_ref` artifact ids; the registry stores

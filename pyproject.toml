@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "inspect-ai>=0.3",
+  "meta-sam-parser>=0.0.6",
   "openai>=1",
   "pillow>=10",
   "pyyaml>=6",

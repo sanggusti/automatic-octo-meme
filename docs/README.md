@@ -11,6 +11,8 @@ advisors** in simulated 3D disaster environments.
 | [compute-split](compute-split.md) | Where each workload runs + trade-off analysis |
 | [action-surface](action-surface.md) | ArduPilot-derived drone tools and skills |
 | [edge-perception](edge-perception.md) | Edge-first vision design and budgets |
+| [sam-segmap](sam-segmap.md) | SAM segmentation maps → routes + severity |
+| [sam-routes-report](sam-routes-report.md) | Progress report: SAM routes + baseline figures |
 | [scenarios](scenarios.md) | Disaster scenario catalog and generator |
 | [watcher](watcher.md) | Scenario watcher: observability & replay |
 | [physics-assets](physics-assets.md) | Physics asset catalog plan |

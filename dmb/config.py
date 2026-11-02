@@ -23,6 +23,7 @@ class Settings:
     runs_dir: str = "runs"
     edge_report_interval_steps: int = 5
     edge_max_snapshots_per_episode: int = 8
+    edge_perception: str = "stub"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -41,6 +42,7 @@ class Settings:
             edge_max_snapshots_per_episode=int(
                 _getenv("DMB_EDGE_MAX_SNAPSHOTS_PER_EPISODE", "8")
             ),
+            edge_perception=_getenv("DMB_EDGE_PERCEPTION", "stub").lower() or "stub",
         )
 
     def require_provider(self, service: str) -> None:
