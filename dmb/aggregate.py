@@ -31,6 +31,14 @@ VECTOR_KEYS = (
     "composite",
 )
 
+ROUTE_KEYS = (
+    "routes_requested",
+    "routes_reachable_rate",
+    "route_safety",
+    "route_excess_length",
+    "spl_like",
+)
+
 
 def record_run(
     run_id: str,
@@ -118,7 +126,7 @@ def _load_rows(runs_dir: Path) -> list[dict]:
                     "sample_id": sample.get("sample_id"),
                     **{
                         k: (sample.get("scores") or {}).get(k)
-                        for k in VECTOR_KEYS
+                        for k in (*VECTOR_KEYS, *ROUTE_KEYS)
                     },
                 }
             )
@@ -155,6 +163,45 @@ def render_markdown(rows: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def uplift_markdown(base_id: str, sam_id: str, runs_dir: str | Path) -> str:
+    """Paired per-sample deltas (sam - base) over matched samples."""
+    rows = _load_rows(Path(runs_dir))
+
+    def keyed(run_id: str) -> dict:
+        return {
+            (r["scenario"], r["seed"], r["sample_id"]): r
+            for r in rows if r["run_id"] == run_id
+        }
+
+    base, sam = keyed(base_id), keyed(sam_id)
+    paired = [k for k in base if k in sam]
+    if not paired:
+        raise ValueError(f"no paired samples between {base_id!r} and {sam_id!r}")
+    lines = [
+        f"| metric | base mean | sam mean | delta mean | n |",
+        "|---|---|---|---|---|",
+    ]
+    for metric in (*VECTOR_KEYS, *ROUTE_KEYS):
+        deltas, bases, sams = [], [], []
+        for k in paired:
+            b, s = base[k].get(metric), sam[k].get(metric)
+            if isinstance(b, (int, float)) and isinstance(s, (int, float)):
+                bases.append(b)
+                sams.append(s)
+                deltas.append(s - b)
+        if not deltas:
+            cells = ["n/a", "n/a", "n/a", "0"]
+        else:
+            cells = [
+                f"{statistics.mean(bases):.3f}",
+                f"{statistics.mean(sams):.3f}",
+                f"{statistics.mean(deltas):+.3f}",
+                str(len(deltas)),
+            ]
+        lines.append("| " + " | ".join([metric, *cells]) + " |")
+    return "\n".join(lines) + "\n"
+
+
 def render_csv(rows: list[dict]) -> str:
     buf = io.StringIO()
     writer = csv.DictWriter(
@@ -185,6 +232,10 @@ def main() -> None:
     table.add_argument("--out", required=True)
     table.add_argument("--csv", default=None)
     table.add_argument("--run", action="append", default=[], help="Only include these run ids (repeatable).")
+    uplift = sub.add_parser("uplift", help="Paired sam-minus-base delta table.")
+    uplift.add_argument("--base", required=True)
+    uplift.add_argument("--sam", required=True)
+    uplift.add_argument("--runs", default="runs")
     args = parser.parse_args()
     if args.command == "record":
         print(
@@ -196,6 +247,8 @@ def main() -> None:
                 indent=2,
             )
         )
+    elif args.command == "uplift":
+        print(uplift_markdown(args.base, args.sam, args.runs), end="")
     else:
         rows = _load_rows(Path(args.runs))
         if args.run:

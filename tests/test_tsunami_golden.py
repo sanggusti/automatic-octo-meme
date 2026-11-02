@@ -47,6 +47,11 @@ def test_tsunami_seed_1_golden():
         "unflooded_fraction": 0.9,
         "debris_cells": 0.0,
         "buried_victims": 0.0,
+        "routes_requested": 0.0,
+        "routes_reachable_rate": 0.0,
+        "route_safety": 0.0,
+        "route_excess_length": 0.0,
+        "spl_like": 3 / 6,  # 3 found at ≤manhattan steps, 3 missed
         "composite": 0.5 * (7 / 13)
         + 0.2 * (7 / 13)
         + 0.15 * (11 / 12)

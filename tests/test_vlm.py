@@ -53,6 +53,21 @@ def test_vlm_mismatched_kind_does_not_mark_found():
     assert all(v["found"] is False for v in bridge.get_state()["victims"])
 
 
+def test_vlm_match_victim_prefers_nearest():
+    bridge = MockBridge.from_metadata({
+        "scenario": "flood", "seed": 0, "grid": {"width": 14, "height": 10},
+        "victim_placements": [
+            {"category": "human", "x": 7, "y": 7},
+            {"category": "human", "x": 7, "y": 6},
+        ],
+        "hazards": [], "difficulty": {}, "dynamics": {},
+    })
+    edge = VLMEdgePerception(
+        bridge, TriggerConfig(), FrameBudget(8), lambda url, prompt: "")
+    assert edge._match_victim(Detection("human", 7, 6, 0.9)).y == 6
+    assert edge._match_victim(Detection("human", 7, 7, 0.9)).y == 7
+
+
 def test_vlm_failure_degrades_quietly():
     bridge = MockBridge.from_metadata(dict(build_samples("forest_fire", seeds=[1])[0].metadata))
 

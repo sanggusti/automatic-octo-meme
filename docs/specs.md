@@ -41,6 +41,8 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 | Episode step budget | 60 | `MockBridge` |
 | Edge heartbeat | every 5 steps | `DMB_EDGE_REPORT_INTERVAL_STEPS` |
 | Snapshot budget | 8 per episode | `DMB_EDGE_MAX_SNAPSHOTS_PER_EPISODE` |
+| Edge backend | `stub` (`sam` opts in) | `DMB_EDGE_PERCEPTION` |
+| SAM scan budget | 3 scans/episode, stale reuse | `DMB_SAM_MAX_SCANS_PER_EPISODE` |
 | Sample seeds (v0) | `[1, 2, 3]` | per task |
 | Victim weights | child 3, human 2, animal 1 | `dmb/scorers/mission.py` |
 

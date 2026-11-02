@@ -101,6 +101,15 @@ def test_pack_excludes_large_variants():
     assert not [i for i in ids if "large" in i]
 
 
+def test_baseline_pack_matches_lm_pack():
+    from evals.pack_baselines import pack_heuristic, pack_random
+    from evals.scenario_pack import scenario_pack
+
+    want = sorted(s.id for s in scenario_pack().dataset)
+    assert sorted(s.id for s in pack_heuristic().dataset) == want
+    assert sorted(s.id for s in pack_random().dataset) == want
+
+
 def test_large_grid_mock_flight():
     from dmb.sim.bridge import MockBridge
 

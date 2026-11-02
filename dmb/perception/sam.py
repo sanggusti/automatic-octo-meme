@@ -40,8 +40,9 @@ from dmb.perception.edge import Detection, StubEdgePerception
 SAM_DEFAULT_BASE_URL = "https://api.meta.ai/v1"
 SAM_DEFAULT_MODEL = "sam-3.1"
 
-# Concepts requested on every frame (all proven on aerial footage).
-BASE_CONCEPTS = ("road", "building", "person", "vehicle", "car")
+# Concepts requested on every frame (all proven on aerial footage except
+# "animal", which is oracle-covered but unbaselined on real footage).
+BASE_CONCEPTS = ("road", "building", "person", "vehicle", "car", "animal")
 # Concepts whose frame coverage feeds the severity index.
 HAZARD_CONCEPTS = ("water", "smoke")
 
@@ -69,8 +70,8 @@ OVERLAP_RULES = (
 SEVERITY_MODERATE_AT = 0.05
 SEVERITY_SEVERE_AT = 0.20
 
-# SAM concepts whose detections can ground to victims (human/child).
-PERSON_CONCEPTS = ("person",)
+# SAM concepts whose detections ground to victims: concept -> categories.
+VICTIM_CONCEPTS = (("person", ("human", "child")), ("animal", ("animal",)))
 
 
 def concepts_for_scenario(name: str) -> tuple[str, ...]:
@@ -385,6 +386,19 @@ def seg_summary_line(seg: SegMap) -> str:
     )
 
 
+def max_scans_from_env(default: int = 3) -> int:
+    """Per-episode SAM scan budget from DMB_SAM_MAX_SCANS_PER_EPISODE."""
+    import os
+
+    raw = os.environ.get("DMB_SAM_MAX_SCANS_PER_EPISODE", "").strip()
+    if not raw:
+        return default
+    value = int(raw)  # invalid integers fail loudly
+    if value < 1:
+        raise ValueError(f"DMB_SAM_MAX_SCANS_PER_EPISODE must be >= 1 (got {value})")
+    return value
+
+
 def sam_from_env() -> Segmenter:
     """Build the default segmenter from DMB_SAM_BASE_URL/_API_KEY/_MODEL."""
     import os
@@ -471,17 +485,30 @@ class SAMEdgePerception(StubEdgePerception):
         segmenter: Segmenter,
         concepts: tuple[str, ...] | list[str] | None = None,
         grounding: Grounding | None = None,
+        max_scans: int | None = None,
+        seg_provider: Callable[[bytes], SegMap] | None = None,
     ) -> None:
         super().__init__(bridge, config, budget)
         self.segmenter = segmenter
         self.concepts = concepts
         self.grounding = grounding
+        self.max_scans = max_scans  # None = unlimited (tests, oracle)
+        # Direct SegMap source (oracle evals); bypasses segmenter+parse.
+        self.seg_provider = seg_provider
         self.last_seg_map: SegMap | None = None
+        self.scans_used = 0
+        self.stale = False
 
     def _scan(self) -> tuple[list[Detection], list]:
-        self.last_seg_map = None
+        self.stale = False
         if not self.bridge.drone.airborne:
             return [], []
+        if self.max_scans is not None and self.scans_used >= self.max_scans:
+            # Scan budget exhausted: reuse the last seg-map, report stale.
+            self.stale = True
+            return [], []
+        self.last_seg_map = None
+        self.scans_used += 1
         try:
             state = self.bridge.get_state()
             if self.concepts is not None:
@@ -494,14 +521,17 @@ class SAMEdgePerception(StubEdgePerception):
             png = self.bridge.capture_frame(f"sam-step-{state.get('steps', 0)}")
             if png is None:
                 return [], []
-            seg = build_seg_map(self.segmenter, png, concepts)
+            if self.seg_provider is not None:
+                seg = self.seg_provider(png)
+            else:
+                seg = build_seg_map(self.segmenter, png, concepts)
         except Exception:
             return [], []
         self.last_seg_map = seg
         detections: list[Detection] = []
         novel: list = []
         if self.grounding is not None:
-            for concept in PERSON_CONCEPTS:
+            for concept, categories in VICTIM_CONCEPTS:
                 result = seg.results.get(concept)
                 if result is None:
                     continue
@@ -513,36 +543,48 @@ class SAMEdgePerception(StubEdgePerception):
                     if cell is None:
                         continue
                     detection = Detection(
-                        label="person",
+                        label=concept,
                         x=cell[0],
                         y=cell[1],
                         confidence=record.confidence or 0.5,
                     )
                     detections.append(detection)
-                    match = self._match_person(detection)
+                    match = self._match_victim(detection, categories)
                     if match is not None and id(match) not in self._known_ids:
                         self._known_ids.add(id(match))
                         novel.append(match)
                         self.bridge.mark_found(match)
         return detections, novel
 
-    def _match_person(self, detection: Detection):
-        """Ground a `person` detection to a human/child victim (±1 cell)."""
+    def _match_victim(self, detection: Detection, categories):
+        """Ground a detection to the nearest same-kind victim (±1 cell)."""
+        best, best_dist = None, None
         for victim in self.bridge.victims:
-            if victim.category not in ("human", "child"):
+            if victim.category not in categories:
                 continue
-            if abs(victim.x - detection.x) <= 1 and abs(victim.y - detection.y) <= 1:
-                return victim
-        return None
+            dist = abs(victim.x - detection.x), abs(victim.y - detection.y)
+            if dist[0] > 1 or dist[1] > 1:
+                continue
+            manhattan = dist[0] + dist[1]
+            if best is None or manhattan < best_dist:
+                best, best_dist = victim, manhattan
+        return best
+
+    def _seg_suffix(self) -> str:
+        if self.last_seg_map is None:
+            return ""
+        suffix = f" {seg_summary_line(self.last_seg_map)}"
+        if self.stale:
+            suffix += " [stale seg-map: scan budget exhausted]"
+        return suffix
 
     def on_step(self, step: int):
         report = super().on_step(step)
-        if report is not None and self.last_seg_map is not None:
-            report.summary = f"{report.summary} {seg_summary_line(self.last_seg_map)}"
+        if report is not None:
+            report.summary = f"{report.summary}{self._seg_suffix()}"
         return report
 
     def on_demand(self, step: int):
         report = super().on_demand(step)
-        if self.last_seg_map is not None:
-            report.summary = f"{report.summary} {seg_summary_line(self.last_seg_map)}"
+        report.summary = f"{report.summary}{self._seg_suffix()}"
         return report
