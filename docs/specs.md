@@ -11,6 +11,7 @@ affected issue.
 |---|---|
 | Python | 3.10.4 (venv `.venv`, setuptools backend) |
 | inspect-ai | 0.3.280 |
+| meta-sam-parser | 0.1.0 (SAM mask decode + prompt builder) |
 | openai client | 3.39.0 (required by inspect-ai OpenAI-compatible provider) |
 | pyyaml | 6.0.3 |
 | pytest | 9.1.1 |

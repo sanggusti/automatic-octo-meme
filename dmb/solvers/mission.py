@@ -29,20 +29,36 @@ def _bridge_for_backend(backend: str):
 @solver
 def drone_mission() -> Solver:
     async def solve(state: TaskState, generate: Generate) -> TaskState:
-        backend = Settings.from_env().sim_backend
+        settings = Settings.from_env()
+        backend = settings.sim_backend
         spec_name = str(dict(state.metadata).get("drone_spec", "quad_iris_class"))
         assert_mission_capable(load_drone_spec(spec_name))
         md = dict(state.metadata)
         md["sample_id"] = str(state.sample_id)
         bridge = _bridge_for_backend(backend).from_metadata(md)
         tod = dict(state.metadata).get("time_of_day_active") or "day"
-        edge = StubEdgePerception(
-            bridge,
-            TriggerConfig(time_of_day=str(tod)),
-            FrameBudget(max_snapshots=8),
-        )
+        perception = settings.edge_perception
+        if perception == "stub":
+            edge = StubEdgePerception(
+                bridge,
+                TriggerConfig(time_of_day=str(tod)),
+                FrameBudget(max_snapshots=8),
+            )
+        elif perception == "sam":
+            from dmb.perception.sam import SAMEdgePerception, sam_from_env  # noqa: PLC0415
+
+            edge = SAMEdgePerception(
+                bridge,
+                TriggerConfig(time_of_day=str(tod)),
+                FrameBudget(max_snapshots=8),
+                sam_from_env(),
+            )
+        else:
+            raise ValueError(
+                f"Unknown DMB_EDGE_PERCEPTION: {perception!r} (want stub|sam)"
+            )
         watcher = watcher_from_env(str(state.sample_id))
-        watcher.on_start({**dict(state.metadata), "backend": backend})
+        watcher.on_start({**dict(state.metadata), "backend": backend, "perception": perception})
         tools: list[Tool] = make_drone_tools(bridge, edge, watcher)
         agent = react(
             prompt=(

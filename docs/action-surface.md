@@ -39,6 +39,7 @@ raise; only infrastructure failures (container, link loss) raise.
 | `return_to_launch` | — | Abort: return and land |
 | `get_telemetry` | — | Position, altitude, battery, steps, violations |
 | `request_edge_report` | — | On-demand perception scan (consumes snapshot budget) |
+| `request_route_map` | — | SAM-only: fresh seg-map + ground routes to located victims (consumes snapshot budget) |
 
 Movement tools append any edge report (`[edge:<trigger>] ...`) so perception
 arrives as a side channel of acting, matching deployment reality.
