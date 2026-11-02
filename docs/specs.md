@@ -62,6 +62,7 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 | Engine/sim | Colosseum (`CodexLabsLLC/Colosseum`, AirSim successor) on Unreal; env binary `Blocks.zip` from release `v2.0.0-beta` (2023-02-27) |
 | Versions | Source `main` @ `c2703d0ccd15d5e72911461af0d064e671c8a29d` (2025-12-08, UE 5.6-only per README); binary UE 5.1; wire client `v2.0.0-beta` @ `7b9658a1169705ca86b21b3518fac5ba83fbe183` |
 | Workstation | This PC: RTX 5060 Ti 16 GB (nvidia-smi; inventory said 5070 Ti), Windows 11 26H2, Python 3.12.10 venv, airsim 1.8.1 (beta client) |
+| Workstation UE | 5.8.4 at `D:\Epic Games\UE_5.8` (verified 2026-11-02); Colosseum has no 5.8 branch (latest `ue-5.7`), so custom envs need UE 5.6 alongside per #46 |
 | Client API | msgpack-rpc 127.0.0.1:41451; reset/enableApiControl/armDisarm/takeoff/land/goHome/moveToPosition/hover/simGetVehiclePose/getMultirotorState/simGetImages verified live. Main-branch client cannot parse this binary's MultirotorState — use the beta client |
 | Grid mapping | Local NED metres around spawn (east=+x, north=+y), 5 m/cell |
 | Isolation | 1 session per sample |
@@ -113,3 +114,6 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-10-29: Track 2 live (#6): Blocks binary runs on the PC, hello
   flight green (arm/takeoff/goto/land + native 256x144 frame), verdict
   mock-vs-Colosseum 3/3 match (forest_fire seeds 1-3, recall 0.0=0.0).
+- 2026-11-02: #50 code-complete: T0 peat/smolder/haze + forest_fire_peat
+  scenario + T2 export path + visual target; live UE legs pending #46.
+  UE 5.8.4 inventoried (Colosseum-incompatible; 5.6 required alongside).

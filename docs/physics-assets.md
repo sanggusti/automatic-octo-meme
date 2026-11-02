@@ -1,8 +1,9 @@
 # Physics Assets — Convincing Worlds for Decision Benchmarks
 
 Status: T0 dynamics in `dmb/physics/` (#26) + weather coupling (#17/#18)
-+ T1 source pins with hashes (#17/#19) + vegetation placement script.
-T1 world builds and T2 dressing remain (tracked in #6).
++ T1 source pins with hashes (#17/#19) + vegetation placement script +
+peat/smolder T0 with T2 export path (#50, code-complete; live UE legs
+pending #46). T1 world builds and T2 dressing remain (tracked in #6).
 
 Principle: physics must be **convincing where decisions depend on it** and
 honestly simple elsewhere. A fire model that spreads wrong teaches the
@@ -38,18 +39,31 @@ redefine, T0 semantics.
   fuel grid (Phase B kept determinism over the originally specified
   probabilistic ignition: same seed + weather ⇒ bit-identical spread,
   which the snapshot tests pin). ROS = base × fuel × (1−moisture) ×
-  wind-alignment; ignite at exposure ≥ threshold.
+  wind-alignment × drought; ignite at exposure ≥ threshold.
 - Wind/weather coupling (#17): `weather_modifiers` per scenario override
   wind/moisture; `build_samples(..., weather=...)` makes weather a sample
   axis. Same seed diverges across weather by construction (tested).
 - Spread-rate tolerance (forest_fire seeds 1–3 @60 steps, ignited cells):
   haze-heavy 2 (ignitions only — wet+still self-contains), haze-moderate
   39, clear 43. Seed-independent (fixed ignition + uniform fuel).
+- Peat/smolder layer (#50, Indonesian peatland style): an optional `peat`
+  block adds underground creep (wind-independent, `smolder_ros` × depth ×
+  dryness) with surface breakouts once smolder exposure matures, a
+  `drought` multiplier on surface ROS (weather-overridable), and a haze
+  index (peat smoke thicker per cell than flame). Ignition on peat starts
+  underground; smolder is not a flight hazard until breakout; no `peat`
+  block ⇒ bit-identical legacy spread (tested).
+- Peat tolerance (forest_fire_peat seed 1 @60 steps, ignited/smolder):
+  drought-moderate 27/50, drought-extreme 57/50; first breakout @35/@19.
 - Check: fixed-seed spread snapshot test + the tolerance bands above.
 - T1: `assets/vegetation/place_trees.py` emits SDF `<include>` per fuel
   cell (seeded pine/oak from pinned Fuel models) + `fuel_tags.json`
-  sidecar (instance → flammability). T2 plan: UE particle fire driven by
-  the same per-cell ignited/burning/burned schedule; no T0 redefinition.
+  sidecar (instance → flammability). T2: `unreal/forest_fire/` exports
+  foliage CSV + `fire_schedule.json` (per-step ignited/smoldering/
+  burning/burned + haze); UE particles/fog play the schedule verbatim.
+- Follow-up (not wired): dynamic haze → edge visibility coupling. T0
+  tracks the haze index; detection radius still follows the static
+  weather/time-of-day axes, so existing golden scores are untouched.
 
 ### Water — floods, flash floods, tsunami
 

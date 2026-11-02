@@ -8,6 +8,7 @@ def test_all_scenarios_load():
         "flood",
         "forest_fire",
         "forest_fire_large",
+        "forest_fire_peat",
         "landslide",
         "landslide_large",
         "tsunami",
@@ -16,6 +17,7 @@ def test_all_scenarios_load():
         config = load_scenario(name)
         assert config.grid["width"] > 0
     assert load_scenario("forest_fire_large").raw["variant_of"] == "forest_fire"
+    assert load_scenario("forest_fire_peat").raw["variant_of"] == "forest_fire"
     assert load_scenario("landslide_large").raw["variant_of"] == "landslide"
 
 
