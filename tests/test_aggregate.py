@@ -2,7 +2,7 @@
 
 import json
 
-from dmb.aggregate import _load_rows, render_csv, render_markdown
+from dmb.aggregate import _load_rows, render_csv, render_markdown, uplift_markdown
 
 
 def _write_run(root, run_id, model, samples):
@@ -69,6 +69,33 @@ def test_scores_from_l2_reproduces_breakdown(tmp_path):
         ' "rescue_recall": 1.0}\n'
     )
     assert scores_from_l2(path) == {"composite": 0.75, "rescue_recall": 1.0}
+
+
+def _uplift_sample(sid, composite, reachable):
+    sample = _sample(sid, "forest_fire", composite)
+    sample["scores"]["routes_reachable_rate"] = reachable
+    return sample
+
+
+def test_uplift_paired_deltas(tmp_path):
+    _write_run(tmp_path, "base", "m", [_uplift_sample("a-1", 0.5, 0.0)])
+    _write_run(tmp_path, "sam", "m",
+               [_uplift_sample("a-1", 0.8, 1.0), _uplift_sample("a-9", 1.0, 1.0)])
+    text = uplift_markdown("base", "sam", tmp_path)
+    assert "| composite | 0.500 | 0.800 | +0.300 | 1 |" in text
+    assert "| routes_reachable_rate | 0.000 | 1.000 | +1.000 | 1 |" in text
+    assert "spl_like" in text  # present but n/a without values
+
+
+def test_uplift_no_pairs_fails_loudly(tmp_path):
+    _write_run(tmp_path, "base", "m", [_sample("a-1", "forest_fire", 0.5)])
+    _write_run(tmp_path, "sam", "m", [_sample("b-1", "forest_fire", 0.5)])
+    try:
+        uplift_markdown("base", "sam", tmp_path)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unpaired runs must fail loudly")
 
 
 def test_table_run_filter(tmp_path, monkeypatch):

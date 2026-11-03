@@ -132,6 +132,28 @@ def project_pixel(
     return (x, y)
 
 
+def grid_to_pixel(
+    cell: tuple[int, int], cam: CameraModel, pose: DronePose, grid: GridSpec
+) -> tuple[float, float] | None:
+    """Inverse map for nadir/north cameras: grid cell center -> pixel.
+
+    Only exact for pitch=90/yaw=0 survey stance (anything else raises);
+    used by the perception oracle to place perfect boxes. Returns None
+    when the cell falls outside the frame.
+    """
+    if cam.pitch_deg != 90.0 or cam.yaw_deg % 360.0 != 0.0:
+        raise ValueError("grid_to_pixel needs the nadir/north survey stance")
+    if pose.altitude_m <= 0 or grid.cell_m <= 0:
+        return None
+    east = (cell[0] + 0.5) * grid.cell_m
+    north = (cell[1] + 0.5) * grid.cell_m
+    u = cam.cx + cam.fx * (east - pose.x * grid.cell_m) / pose.altitude_m
+    v = cam.cy + cam.fy * (pose.y * grid.cell_m - north) / pose.altitude_m
+    if not (0 <= u < cam.width and 0 <= v < cam.height):
+        return None
+    return (u, v)
+
+
 def project_mask(
     record,  # SAMRecord (duck-typed to keep this module dependency-free)
     raster: bytes,

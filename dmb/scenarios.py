@@ -76,6 +76,15 @@ def list_scenarios(scenarios_dir: str | Path = SCENARIOS_DIR) -> list[str]:
     return sorted(p.stem for p in Path(scenarios_dir).glob("*.yaml"))
 
 
+def pack_scenarios(scenarios_dir: str | Path = SCENARIOS_DIR) -> list[str]:
+    """Base disasters only; ``variant_of`` scenarios run via their own tasks."""
+    return [
+        n
+        for n in list_scenarios(scenarios_dir)
+        if "variant_of" not in load_scenario(n, scenarios_dir).raw
+    ]
+
+
 def world_hash(scenario: str, seed: int, victim_placements: list[dict]) -> str:
     """Deterministic fingerprint: same (scenario, seed) must hash equal."""
     payload = json.dumps(

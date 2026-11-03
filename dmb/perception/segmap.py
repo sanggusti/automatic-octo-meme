@@ -12,6 +12,12 @@ import heapq
 from dataclasses import dataclass
 from typing import Callable
 
+from dmb.perception.grounding import (
+    grid_from_state,
+    pose_from_state,
+    project_mask,
+    survey_camera,
+)
 from dmb.perception.sam import HAZARD_CONCEPTS, SegMap
 
 COST_ROAD = 0.5
@@ -130,6 +136,42 @@ def plan_routes(
     goals: list[tuple[int, int]],
 ) -> list[Route]:
     return [plan_route(grid, start, goal) for goal in goals]
+
+
+def render_route_map(
+    seg: SegMap,
+    state: dict,
+    cell_m: float,
+    assumed_geometry: bool = True,
+    stride: int = 2,
+) -> str:
+    """Shared tool/solver composition: seg-map + state -> rescuer text."""
+    if seg.frame_size is None:
+        return "Route map unavailable: empty seg-map."
+    cam = survey_camera(*seg.frame_size)
+    pose = pose_from_state(state)
+    spec = grid_from_state(state, cell_m)
+
+    def project_concept(concept: str):
+        result = seg.results.get(concept)
+        if result is None:
+            return set()
+        cells: set[tuple[int, int]] = set()
+        for record, raster in zip(result.records, result.rasters):
+            if raster is None:
+                continue
+            cells |= project_mask(record, raster, cam, pose, spec, stride)
+        return cells
+
+    road, hazard, blocked = ground_concepts(project_concept)
+    grid = cost_grid(spec.width, spec.height, road, hazard, blocked)
+    start = (int(state["drone"]["x"]), int(state["drone"]["y"]))
+    goals = [
+        (int(v["x"]), int(v["y"]))
+        for v in state.get("victims", []) if v.get("found")
+    ]
+    return format_route_map(
+        seg, plan_routes(grid, start, goals), start, cell_m, assumed_geometry)
 
 
 def format_route_map(

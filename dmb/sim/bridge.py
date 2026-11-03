@@ -46,6 +46,45 @@ class Observation:
     edge_report: dict | None = None
 
 
+def danger_cells_from_state(state: dict) -> set[tuple[int, int]]:
+    """Danger cells realized by episode end (pure mirror of _in_hazard).
+
+    Union of activated `cell_danger` entries (due step <= final steps)
+    and phase-active static hazard circles. Shared by scorers and the
+    perception oracle so both judge against identical truth.
+    """
+    steps = int(state.get("steps", 0) or 0)
+    danger: set[tuple[int, int]] = set()
+    for key, due in (state.get("cell_danger", {}) or {}).items():
+        try:
+            x, y = (int(v) for v in str(key).split(","))
+            due_step = int(due)
+        except (ValueError, TypeError):
+            continue
+        if due_step <= steps:
+            danger.add((x, y))
+    grid = state.get("grid", {}) or {}
+    width, height = int(grid.get("width", 10)), int(grid.get("height", 10))
+    phases = [str(p.get("name")) for p in state.get("phases", [])]
+    try:
+        phase_idx = phases.index(str(state.get("phase", "")))
+    except ValueError:
+        phase_idx = 0
+    for hz in state.get("hazards", []) or []:
+        try:
+            if int(hz.get("active_from_phase", 0)) > phase_idx:
+                continue
+            cx, cy = int(hz.get("x", -1)), int(hz.get("y", -1))
+            r = float(hz.get("radius", 0))
+        except (ValueError, TypeError):
+            continue
+        for x in range(max(0, int(cx - r)), min(width, int(cx + r) + 1)):
+            for y in range(max(0, int(cy - r)), min(height, int(cy + r) + 1)):
+                if math.hypot(x - cx, y - cy) <= r:
+                    danger.add((x, y))
+    return danger
+
+
 class SimBridge(ABC):
     """Backend-agnostic episode interface. One instance per sample."""
 

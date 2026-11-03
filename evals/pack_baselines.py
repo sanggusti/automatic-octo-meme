@@ -2,16 +2,16 @@
 
 from inspect_ai import Task, task
 
-from dmb.scenarios import build_samples, list_scenarios
+from dmb.scenarios import build_samples, pack_scenarios
 from dmb.scorers.mission import mission_score
 from dmb.solvers.baselines import heuristic_mission, random_mission
 
-PACK_SEEDS = [1, 2, 3]  # same pack as evals/scenario_pack.py
+PACK_SEEDS = [1, 2, 3]  # same seeds as evals/scenario_pack.py
 
 
 def _pack():
     dataset = []
-    for scenario in list_scenarios():
+    for scenario in pack_scenarios():
         dataset.extend(build_samples(scenario, seeds=PACK_SEEDS))
     return dataset
 

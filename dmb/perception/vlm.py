@@ -108,10 +108,15 @@ class VLMEdgePerception(StubEdgePerception):
         return detections, novel
 
     def _match_victim(self, det: Detection):
-        """Ground a reported detection to a true victim (±1 cell, same kind)."""
+        """Ground a reported detection to the nearest true victim (±1 cell)."""
+        best, best_dist = None, None
         for victim in self.bridge.victims:
             if victim.category != det.label:
                 continue
-            if abs(victim.x - det.x) <= 1 and abs(victim.y - det.y) <= 1:
-                return victim
-        return None
+            dist = abs(victim.x - det.x), abs(victim.y - det.y)
+            if dist[0] > 1 or dist[1] > 1:
+                continue
+            manhattan = dist[0] + dist[1]
+            if best is None or manhattan < best_dist:
+                best, best_dist = victim, manhattan
+        return best

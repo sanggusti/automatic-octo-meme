@@ -45,13 +45,18 @@ def drone_mission() -> Solver:
                 FrameBudget(max_snapshots=8),
             )
         elif perception == "sam":
-            from dmb.perception.sam import SAMEdgePerception, sam_from_env  # noqa: PLC0415
+            from dmb.perception.sam import (  # noqa: PLC0415
+                SAMEdgePerception,
+                max_scans_from_env,
+                sam_from_env,
+            )
 
             edge = SAMEdgePerception(
                 bridge,
                 TriggerConfig(time_of_day=str(tod)),
                 FrameBudget(max_snapshots=8),
                 sam_from_env(),
+                max_scans=max_scans_from_env(),
             )
         else:
             raise ValueError(

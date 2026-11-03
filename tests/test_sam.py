@@ -17,6 +17,7 @@ from dmb.perception.sam import (
     concepts_for_scenario,
     decode_record_mask,
     mask_fill,
+    max_scans_from_env,
     parse_sam_output,
     parse_sam_video_output,
     rasterize_concept,
@@ -25,7 +26,7 @@ from dmb.perception.sam import (
     sam_from_env,
     severity_of,
 )
-from dmb.perception.edge import FrameBudget, TriggerConfig
+from dmb.perception.edge import Detection, FrameBudget, TriggerConfig
 from dmb.scenarios import build_samples
 from dmb.sim.bridge import MockBridge
 
@@ -88,7 +89,7 @@ def test_parse_video_frames_keyed_by_marker():
 
 def test_concepts_for_scenario():
     assert concepts_for_scenario("flood") == (
-        "road", "building", "person", "vehicle", "car", "water")
+        "road", "building", "person", "vehicle", "car", "animal", "water")
     assert "smoke" in concepts_for_scenario("forest_fire_large")
     assert "tent" in concepts_for_scenario("earthquake")
     try:
@@ -209,6 +210,68 @@ def test_sam_edge_without_grounding_reports_no_victims():
     assert report.detections == []  # pixels cannot ground to grid without a camera model
     assert "segmap" in report.summary
     assert edge.last_seg_map is not None
+
+
+def test_max_scans_from_env():
+    old = dict(os.environ)
+    try:
+        os.environ.pop("DMB_SAM_MAX_SCANS_PER_EPISODE", None)
+        assert max_scans_from_env() == 3
+        os.environ["DMB_SAM_MAX_SCANS_PER_EPISODE"] = "7"
+        assert max_scans_from_env() == 7
+        for bad in ("0", "-2", "lots"):
+            os.environ["DMB_SAM_MAX_SCANS_PER_EPISODE"] = bad
+            try:
+                max_scans_from_env()
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"must reject {bad!r}")
+    finally:
+        os.environ.clear()
+        os.environ.update(old)
+
+
+def test_scan_budget_reuses_last_map_and_marks_stale():
+    bridge = MockBridge.from_metadata(dict(build_samples("forest_fire", seeds=[1])[0].metadata))
+    calls = []
+
+    def segmenter(png: bytes, concept: str) -> str:
+        calls.append(concept)
+        return _person_line() if concept == "person" else ""
+
+    edge = SAMEdgePerception(
+        bridge, TriggerConfig(), FrameBudget(8), segmenter, max_scans=1)
+    bridge.act("arm", {})
+    bridge.act("takeoff", {"altitude_m": 10})
+    first = edge.on_demand(bridge.get_state()["steps"])
+    assert "stale" not in first.summary
+    assert edge.scans_used == 1
+    kept = edge.last_seg_map
+    second = edge.on_demand(bridge.get_state()["steps"])
+    assert edge.scans_used == 1  # no new scan
+    assert edge.last_seg_map is kept  # reuse, not empty
+    assert "[stale seg-map: scan budget exhausted]" in second.summary
+    assert len(calls) == len(concepts_for_scenario("forest_fire"))
+
+
+def test_match_victim_prefers_nearest():
+    bridge = MockBridge.from_metadata({
+        "scenario": "flood", "seed": 0, "grid": {"width": 14, "height": 10},
+        "victim_placements": [
+            {"category": "human", "x": 7, "y": 7},
+            {"category": "human", "x": 7, "y": 6},
+        ],
+        "hazards": [], "difficulty": {}, "dynamics": {},
+    })
+    edge = SAMEdgePerception(
+        bridge, TriggerConfig(), FrameBudget(8), lambda png, c: "")
+    assert edge._match_victim(
+        Detection("person", 7, 6, 0.9), ("human", "child")).y == 6
+    assert edge._match_victim(
+        Detection("person", 7, 7, 0.9), ("human", "child")).y == 7
+    assert edge._match_victim(
+        Detection("person", 0, 0, 0.9), ("human", "child")) is None
 
 
 def test_sam_edge_failure_degrades_quietly():

@@ -6,16 +6,11 @@ via their own tasks so the published pack table stays comparable.
 
 from inspect_ai import Task, task
 
-from dmb.scenarios import build_samples, list_scenarios, load_scenario
+from dmb.scenarios import build_samples, pack_scenarios
 from dmb.scorers.mission import mission_score
 from dmb.solvers.mission import drone_mission
 
 PACK_SEEDS = [1, 2, 3]
-
-
-def pack_scenarios() -> list[str]:
-    """Base disasters only; ``*_large`` variants run via their own tasks."""
-    return [n for n in list_scenarios() if "variant_of" not in load_scenario(n).raw]
 
 
 @task

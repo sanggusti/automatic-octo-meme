@@ -20,8 +20,13 @@ native frame (Gazebo / Colosseum capture_frame)
 ## Concept table (evidence from the 2026-11-02 live baseline)
 
 Base concepts on every frame: `road`, `building`, `person`, `vehicle`,
-`car`. Scenario extras: fire → `smoke`; tsunami/flash_flood/flood →
-`water`; earthquake → `tent` (relief camps); landslide → none yet.
+`car`, `animal` (`animal` is oracle-covered, unbaselined on footage).
+Scenario extras: fire → `smoke`; tsunami/flash_flood/flood → `water`;
+earthquake → `tent` (relief camps); landslide → none yet.
+
+Live scans are capped by `DMB_SAM_MAX_SCANS_PER_EPISODE` (default 3):
+past the budget the edge reuses its last seg-map and marks reports
+stale, bounding episode cost at ~7 concepts × budget × $0.0025.
 
 Proven (26 image requests, true-mask overlays checked): houses ×41–50,
 roads through rubble, flooded-region masks (frame 0.36), water, person,
@@ -69,6 +74,26 @@ given. No camera is calibrated yet: the tool uses the documented
 `survey_camera` nadir stance and labels output assumed. Evidence and
 figures: [sam-routes-report](sam-routes-report.md).
 
+## Native A/B runbook (gated)
+
+Compares `DMB_EDGE_PERCEPTION=stub` vs `sam` arms on native frames.
+Gates: #45 keyframes green, #48 footage flowing, camera FOV/pose logged
+for calibration, scan budget set. Same seeds both arms:
+
+```bash
+DMB_SIM_BACKEND=gazebo-sitl <log-vars> \
+  .venv/bin/inspect eval evals/forest_fire.py --model <id> --limit N
+# rerun with DMB_EDGE_PERCEPTION=sam, then:
+.venv/bin/python -m dmb.aggregate record --run-id <stub> ... --log <stub.eval>
+.venv/bin/python -m dmb.aggregate record --run-id <sm> ... --log <sam.eval>
+.venv/bin/python -m dmb.aggregate uplift --base <stub> --sam <sm>
+```
+
+Label every native route output with its geometry provenance (assumed
+until calibrated). Oracle ceiling first: `evals/routes_oracle.py`
+(scripted, provider-free) must read excess 1.0 / safety 1.0 on clean
+worlds before any live A/B counts.
+
 ## Module map
 
 - `dmb/perception/sam.py`: parser, masks, `concepts_for_scenario`,
@@ -77,6 +102,8 @@ figures: [sam-routes-report](sam-routes-report.md).
 - `dmb/perception/grounding.py`: `CameraModel`, `project_pixel`,
   `project_mask`, assumed `survey_camera`.
 - `dmb/perception/segmap.py`: cost grid, A* `plan_route`,
-  `format_route_map`.
+  `format_route_map`, shared `render_route_map`.
+- `dmb/perception/oracle.py`: perfect seg-maps from sim truth (ceiling
+  evals only); `evals/routes_oracle.py` + `tests/test_oracle_routes.py`.
 - `tests/test_sam.py`, `tests/test_grounding.py`, `tests/test_segmap.py`
   + `tests/fixtures/sam_*.txt` (real outputs).
