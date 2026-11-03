@@ -177,6 +177,11 @@ Get-Process Blocks-Win64-DebugGame -ErrorAction SilentlyContinue | Stop-Process 
 
 ## 7. Forest-fire env (issue #50, operator legs)
 
+New-env walkthrough with all gotchas: `docs/custom-env-guide.md`
+(toolchain, map generation, packaging, flight rules, troubleshooting
+matrix with screenshots). Whiteout bisect record:
+`docs/forest-fire-whiteout.md`.
+
 Code-complete in-repo; live legs need the #46 toolchain (UE 5.6 +
 Colosseum source build). The PC's UE 5.8.4
 (`D:\Epic Games\UE_5.8`, verified 2026-11-02) cannot build Colosseum —

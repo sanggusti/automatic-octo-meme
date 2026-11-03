@@ -85,6 +85,9 @@ never pipe UBT output through `Select-Object -First N` (it kills UBT).
   markers must be `NO_COLLISION` or the drone wedges on them.
 - Grid mapping: grid (x=east, y=north) -> UE cm (X=y*500, Y=x*500);
   PlayerStart at the grid CORNER (trees sit at cell centers).
+  Spawn-adjacent trees crowd the default camera (brown mass at frame
+  edge is the nearest trunk, not a bug); check framing on the ground
+  capture before trusting angles.
 
 ## Verify on packaged builds, not `-game`
 
@@ -93,6 +96,10 @@ rendering/capture has known quirks. The ladder is: build -> package ->
 run packaged -> fly -> capture -> LOOK at every frame. Clean logs with
 broken images are the norm for: inverted winding, unconnected BaseColor,
 bad exposure, unlit scenes.
+Exposure dead ends: NO exposure API exists in either PythonClient, and
+float Scene captures return zeros (unsupported) — fix the lights, don't
+chase those. Incremental cooks take ~20s; delete `Saved/Cooked` +
+`Saved/StagedBuilds` for a clean recook (~1min).
 
 ## RPC / flight rules
 
@@ -118,6 +125,9 @@ bad exposure, unlit scenes.
 
 Progress lives on the tracking issues: post versions, commands, and
 evidence tables per step. The user compiles progress reports from them.
+Promote key frames to `docs/img/` + a short evidence doc per env
+(`runs/` is git-ignored); the full new-env walkthrough with gotchas
+is `docs/custom-env-guide.md`.
 
 ## Surveyed sources
 

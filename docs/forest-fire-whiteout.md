@@ -28,6 +28,9 @@ True physical daylight needs a PostProcessVolume + exposure tuning
 
 Fix: `ue_build_maps.py` sets DirectionalLight intensity `10.0`.
 
+![pure-white Scene capture: the whiteout](img/whiteout_white.png)
+![segmentation from the same pose: geometry renders fine](img/seg_ok.png)
+
 ## 2. Blue flames: swatch PNGs render R/B-swapped
 
 With the whiteout fixed, flames rendered vivid blue instead of orange
@@ -40,6 +43,8 @@ order without a packaged capture proving orange flames).
 
 After the fix: blue pixels 0 in all frames, thousands of orange pixels
 wherever fire is in view; trunks brown, canopy green.
+
+![flames rendering blue before the BGR fix](img/fire_blue.png)
 
 ## 3. Live verification (final package, 2026-11-03)
 
