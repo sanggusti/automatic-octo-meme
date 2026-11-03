@@ -49,10 +49,10 @@ to local NED metres around spawn (east = +x, north = +y).
 - [x] Visual target grounded in October 2026 peat-fire reporting
 - [x] Asset pins, manifest-style (verified entries pinned; art + GIS
       tiles explicitly pending-operator, no invented URLs)
-- [ ] Map built + packaged on the PC (needs #46 toolchain)
-- [ ] Before-variant reference keyframes captured
-- [ ] Drone spawns, hello flight green, eval end-to-end on burning map
-- [ ] Env + pins recorded in runbook/specs (this README is the draft;
+- [x] Map built + packaged on the PC (UE 5.6 + Colosseum main; both maps reload-verified: 100 trees, 27 flames, 50 smoke)
+- [x] Before-variant reference keyframes captured (`docs/img/before_ground.png`)
+- [x] Drone spawns, hello flight green, eval end-to-end on burning map (hello arm/takeoff/goto/land + frame; verdict mock-vs-Colosseum 3/3 non-vacuous on `forest_fire_peat` seeds 1-3)
+- [x] Env + pins recorded in runbook/specs (`docs/forest-fire-whiteout.md`, `docs/specs.md` status log);
       specs update lands with the live verification)
 
-Live legs stay on #50 after merge — see the PR body.
+Live legs closed 2026-11-03 — see `docs/forest-fire-whiteout.md` for the whiteout bisect (sun 75k root cause, BGR swatch fix) and verification.

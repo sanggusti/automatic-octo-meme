@@ -60,14 +60,25 @@ never pipe UBT output through `Select-Object -First N` (it kills UBT).
 
 ## Python map generation (patterns that survived contact)
 
-- Materials: `connect_material_property` needs EXPLICIT pin names
-  (`'RGB'` for Color3Vector, `'R'` for scalar) and returns `False` for
-  bad pins — assert the return. `""` wires output `""`, which probes
-  show as connected but renders black. Always `save_asset` after edits.
+- Materials: on constant expressions only `""` (first output) and `"R"`
+  are valid pins; `"RGB"`/`"RGBA"` return `False` (assert every connect).
+  No RGB composite exists on constants, so feed colors via 4x4 PNG
+  swatches + TextureSample `"RGB"` (probed + vitez pattern),
+  emissive-mirrored for a readable unlit placeholder look. Always
+  delete-recreate materials on rebuild; always `save_asset` after edits.
+- Textures: delete-recreate on reimport too (`replace_existing` alone
+  leaves stale bulk data). The stdlib PNG writer's bytes render R/B
+  swapped in-engine (PIL-correct file, blue flames live), so it
+  pre-swaps to BGR order; pinned by `tests/test_terrain_gen.py`.
 - Fog: 5.6 renamed the tint to `fog_inscattering_luminance`
   (`fog_inscattering_color` is deprecated and missing from Python).
 - Lights: movable DirectionalLight + movable SkyLight, no lightmap bake
   (static lights + no bake = "lighting needs to be rebuilt" + black).
+  Sun intensity 10, NEVER physical 75k lux: 75k whites every Scene
+  capture to pure-255 on all maps (bisected B1/B2; skylight
+  real_time_capture innocent, DXCache purge + clean recook no help).
+  Scene brightness is emissive/fog-driven; true daylight needs a
+  PostProcessVolume + exposure tuning (open follow-up).
 - No `line_trace_single` under `-cmd` (returns None, no physics scene):
   bake analytic heights into the generator sidecar instead.
 - Collision: terrain complex-as-simple; trees collide; fire/smoke/glow
@@ -87,9 +98,14 @@ bad exposure, unlit scenes.
 
 - One vehicle per episode; RPC port 41451; settings.json needs a
   Multirotor entry or the server never starts.
-- `moveToPositionAsync().join()` waits FOREVER when wedged (verified:
-  30+ min against a decorative cube). Always run flights with a
-  watchdog timeout, and prefer altitudes that clear map clutter.
+- Never `.join()` a `moveToPositionAsync`: the move can be silently
+  ignored and the join hangs forever even at clear altitude (verified
+  twice, not just when wedged). Fire-and-poll the pose with a timeout,
+  then `hoverAsync().join()` to cancel before the next leg.
+  `rotateToYawAsync().join()` and `takeoff/landAsync().join()` are safe.
+- Custom main-branch builds need the MAIN PythonClient
+  (`D:\programming\Colosseum\PythonClient`); the beta client connects
+  but cannot parse their poses. The beta binary needs the beta client.
 - Never `simSetCameraPose` during verification: poses persist across
   `reset()` and poison later captures (including identical-byte
   "placeholder" frames). Fly the drone for angles; capture the default
