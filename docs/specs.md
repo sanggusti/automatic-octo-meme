@@ -118,3 +118,8 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-11-02: #50 code-complete: T0 peat/smolder/haze + forest_fire_peat
   scenario + T2 export path + visual target; live UE legs pending #46.
   UE 5.8.4 inventoried (Colosseum-incompatible; 5.6 required alongside).
+- 2026-11-03: #50 live legs closed: ForestFire env built + packaged
+  (UE 5.6, Colosseum main), whiteout bisected to sun 75k (fix: 10) +
+  BGR swatch pre-swap (orange flames), hello green + verdict 3/3
+  non-vacuous on forest_fire_peat (recall 0.5/0.5/0.6, zero diffs).
+  Evidence: docs/forest-fire-whiteout.md + docs/img/.
