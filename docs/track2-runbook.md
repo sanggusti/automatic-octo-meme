@@ -196,3 +196,44 @@ install UE 5.6 alongside, do not upgrade the env to 5.8.
 4. Capture before-variant reference keyframes (one per visual-target
    phase in `unreal/forest_fire/VISUAL_TARGET.md`) into the issue.
 5. Update `docs/specs.md` (env binary + pins) in the closing PR.
+
+## 8. Peatforest env (issues #64/#65/#66, as-run 2026-11-03)
+
+Real-data peatland maps (`PeatBefore` lush / `PeatBurning` charred +
+fire). Full record: `docs/peatforest-report.md` (tile reasoning, pins,
+seeds, counts, frame time, spawn/bounds, deviations, bug bisects).
+
+1. Prep (pinned data in `assets/manifest.yaml`, `gis:`):
+   `prep_tile.py --out data/peatforest/ue_inputs`,
+   `gen_terrain.py --seed 7 --out data/peatforest/ue_gen`,
+   `gen_groves.py --gen ... --out ...`, stage to
+   `<project>/inputs/peatforest/`.
+2. Build each map (`DMB_MAPS=before|burning`):
+   `UnrealEditor-cmd.exe ForestFire.uproject -run=pythonscript
+   -script=unreal/peatforest/tools/ue_build_peat.py -unattended
+   -nopause -nosplash`; verdict lands in
+   `<project>/Saved/PeatBuild_OK.txt`. Under a shell sandbox these
+   runs need one-shot escalation (DDC + project writes are blocked).
+3. Package: RunUAT `BuildCookRun ... -cook -build -stage -pak
+   -archive -archivedirectory=ForestFire-Pkg` (stop any running game
+   first — it locks the `.ucas` stage copy).
+4. Fly: `ForestFire.exe PeatBurning -RenderOffScreen -ResX=1280
+   -ResY=720`, MAIN PythonClient, RPC 41451. Spawn = tile SW corner
+   (NED origin); bounds x,y in `[0,2000]` m; 5 m/cell grid.
+5. Eval: `runs/peat_eval.py mock` (no game) then `both` (game up);
+   expect mock/bridge match, recall ~0.5, safety 1.0.
+6. Hi-fi v1 (structure landed, fidelity open — see report):
+   `gen_textures.py` (leaf/flame/smoke alpha), `gen_groves.py` v2
+   (4 variants + charred), stage `tex/` + `assets_raw/` (PBR pins)
+   beside `ue_gen`, `DMB_MAPS=both` build. Materials need
+   `used_with_nanite` (no `b_` prefix) or Nanite meshes render
+   default-gray. Never connect `MaterialExpressionVertexColor`
+   (editor access-violation crash, 3x).
+7. Gotchas that cost a day: (a) the shell sandbox blocks LOOPBACK
+   TCP — in-sandbox RPC clients die with WinError 10013 masked as
+   "port never opened" while the game LISTENs fine. Run every
+   survey/RPC/game command escalated. (b) Kill games BY NAME
+   (bootstrap + inner exe): a stale inner holds 41451 and the next
+   boot bind-fails into an invisible headless modal that blocks the
+   game thread. (c) AirSim `LogMessage` is screen-only — RPC
+   startup failures never reach the packaged log.
