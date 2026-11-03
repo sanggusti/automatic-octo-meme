@@ -28,7 +28,7 @@ def test_manifest_entries_pinned():
             assert entry["params"].startswith("https://"), path
             assert entry["model"].startswith("https://"), path
             continue
-        allowed = ("https://fuel.gazebosim.org/", "https://copernicus-dem-30m.s3.amazonaws.com/", "https://planetarycomputer.microsoft.com/", "https://firms.modaps.eosdis.nasa.gov/")
+        allowed = ("https://fuel.gazebosim.org/", "https://copernicus-dem-30m.s3.amazonaws.com/", "https://planetarycomputer.microsoft.com/", "https://firms.modaps.eosdis.nasa.gov/", "https://dl.polyhaven.org/")
         assert entry["url"].startswith(allowed), path
         assert "tip" not in entry["url"] and "latest" not in entry["url"], path
         sha = entry.get("sha256", "")

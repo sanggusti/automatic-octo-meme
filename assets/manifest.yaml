@@ -79,3 +79,37 @@ gis:
     sha256: ca7113a1758fa9f6885f1c5dffa16c7bc60fdd63637a5ad42cefcce597f68818
     license: NASA FIRMS open data (verify at download)
     use: tile-C fire fronts (10 hotspots 2019-09-07..21)
+pbr:
+  # Peatforest fidelity pass (#65): CC0 PBR from PolyHaven (no account).
+  # Files vendored to data/peatforest/assets_raw/ (untracked bulk) at
+  # build time; hashes below are the pinned bytes.
+  bark_brown_02_diff_1k:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_brown_02/bark_brown_02_diff_1k.jpg
+    version: bark_brown_02 (PolyHaven, 1k JPG)
+    sha256: 920fa0bed0c9d78c1d530e99795113afd532d7db746de440f4a85d7c83ed0f1a
+    license: CC0-1.0
+    use: trunk + charred-snag albedo
+  bark_brown_02_nor_1k:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/bark_brown_02/bark_brown_02_nor_dx_1k.png
+    version: bark_brown_02 (PolyHaven, 1k PNG normal)
+    sha256: 927eebec151c2316e8b6dbdb8f20afa8d28275d6beac2fcee02e8e031eb78a61
+    license: CC0-1.0
+    use: trunk normal map
+  brown_mud_leaves_01_diff_1k:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_leaves_01/brown_mud_leaves_01_diff_1k.jpg
+    version: brown_mud_leaves_01 (PolyHaven, 1k JPG)
+    sha256: c598c555f13cd5328409fd5e2a45496a26e319e52299e3959042f1449c2f1b06
+    license: CC0-1.0
+    use: ground detail albedo (tiled over S2)
+  brown_mud_leaves_01_nor_1k:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brown_mud_leaves_01/brown_mud_leaves_01_nor_dx_1k.png
+    version: brown_mud_leaves_01 (PolyHaven, 1k PNG normal)
+    sha256: 3823ba3222353b372d3dc348ed1465f3df9be79508e0da891721be2c16435e89
+    license: CC0-1.0
+    use: ground detail normal map
+  burned_ground_01_diff_1k:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/burned_ground_01/burned_ground_01_diff_1k.jpg
+    version: burned_ground_01 (PolyHaven, 1k JPG)
+    sha256: be83310cad64d23539e628f14525af651a03646f5a1cc6029bd19a9446ea72f9
+    license: CC0-1.0
+    use: burn-scar ground patches at hotspots

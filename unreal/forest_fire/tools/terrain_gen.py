@@ -1,7 +1,9 @@
 """Peatland heightfield generator (#50, stdlib only).
 
-Writes terrain.obj (centimetre units, Y-up) + meta.json (spawn height,
-grid mapping) for the UE map build. Gentle noise relief, a peat dome
+Writes terrain.obj (centimetre units, Z-up: x=north_cm, y=-east_cm,
+z=up_cm: UE5.6 Interchange maps OBJ (x,y,z)->(X,-Y,Z), so east must be
+pre-negated or the tile lands mirrored at -Y)
++ meta.json (spawn height, grid mapping) for the UE map build. Gentle noise relief, a peat dome
 under the drained eastern block, and a drainage-canal trench along the
 peat boundary — the Indonesian peatland signature.
 
@@ -74,8 +76,12 @@ def main() -> None:
         for ix in range(N):
             east_m = ix * STEP_M
             h_cm = height_m(noise, east_m, north_m) * 100.0
-            # Y-up OBJ: x = north, y = height, z = east (verified on import)
-            verts.append((north_m * 100.0, h_cm, east_m * 100.0))
+            # Z-up OBJ: x = north, y = -east, z = height (import negates Y).
+            # Z is verbatim (Y-up renders as a vertical wall); Y is negated
+            # (bisected live: +y OBJ content landed at NED -y).
+            # Faces wound for +Z normals (see below).
+            # (docstring has the full convention).
+            verts.append((north_m * 100.0, -east_m * 100.0, h_cm))
 
     lines = ["# peatland heightfield (DMB #50)", f"# seed {args.seed}"]
     lines += [f"v {x:.2f} {y:.2f} {z:.2f}" for x, y, z in verts]
@@ -85,7 +91,7 @@ def main() -> None:
             b = a + 1
             c = a + N
             d = c + 1
-            # CCW from above in OBJ space (x=north, y=up, z=east): normals +Y.
+            # CW from above after the Y-negation: normals +Z.
             lines += [f"f {a} {b} {c}", f"f {b} {d} {c}"]
     (out / "terrain.obj").write_text("\n".join(lines) + "\n")
 
@@ -126,6 +132,8 @@ SWATCHES = {
     # Control swatches: unlit black bases + roughness/specular wiring.
     "black": (0, 0, 0),
     "white": (255, 255, 255),
+    # Peat canal water: dark tea-green (stand-in flat; real water later).
+    "water": (46, 80, 72),
 }
 
 
