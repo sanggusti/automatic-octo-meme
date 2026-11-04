@@ -53,9 +53,11 @@ metadata + entrypoints only.
   100 m yaw sweeps + fire approaches, Scene/Seg/DepthVis. White 0.0
   everywhere; depth varied (no walls).
 - **Hello (green):** arm → takeoff `(0,0,-1.7)` → goto `(27.5,0,-7.5)` →
-  1280x720 native frame → touchdown `(31.2,0,+0.4)`, `collided=true`
-  (shell stops descent; `landAsync` itself has an upstream spool race,
-  so touchdown uses open-loop velocity-descend — see gotchas).
+  1280x720 native frame → touchdown, shell stops descent
+  (`landAsync` itself has an upstream spool race, so touchdown uses
+  velocity-descend gated on contact time_stamp + 3 s stall — rest
+  center reads surface + 1.31 m, flag resets per RPC read; see
+  runbook §8.8).
 - **Mock eval end-to-end on PeatBurning:** `forest_fire_peat` rollout
   (arm/takeoff/goto 2 victims/land), mock-vs-bridge seeds 1+2:
   **match, recall 0.5, safety 1.0, found_any 1.0** (non-vacuous).

@@ -237,3 +237,16 @@ seeds, counts, frame time, spawn/bounds, deviations, bug bisects).
    boot bind-fails into an invisible headless modal that blocks the
    game thread. (c) AirSim `LogMessage` is screen-only — RPC
    startup failures never reach the packaged log.
+8. Collision verdict (bisected live 2026-11-04, shell WORKS -- the
+   "fall-through" was three stacked misreads): (a) rest center reads
+   surface + 1.31 m (pawn collision extent below the reported origin;
+   verified to the cm at two sites, slow 0.3 and fast 1.5 m/s legs,
+   no tunneling). Never expect center ~= surface. (b) simGetCollisionInfo
+   RPC calls getCollisionInfoAndReset -- has_collided resets on EVERY
+   read, so level-polling flashes True once then False while resting;
+   touchdown = fresh time_stamp + 3 s z-stall (runs/peat_survey.py
+   section 4). (c) Tile relief spans NED -14.2..-1.3 m, so rest depths
+   vary by site -- compare against heights.json, not a constant.
+   (d) The PeatPad bisect plate landed coplanar with the shell (same
+   height), so it cannot discriminate pad-vs-shell; the (100,100)
+   probe 40 m off-pad blocking identically is the shell proof.
