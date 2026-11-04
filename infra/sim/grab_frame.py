@@ -5,6 +5,7 @@ Runs INSIDE the sim container (needs gz-transport + gz-msgs bindings).
 Usage: grab_frame.py <out.png> [timeout_s]
 """
 
+import os
 import struct
 import sys
 import threading
@@ -13,9 +14,10 @@ from gz.msgs10.image_pb2 import Image
 from gz.transport13 import Node
 from PIL import Image as PILImage
 
-TOPIC = (
+TOPIC = os.environ.get(
+    "GZ_GRAB_TOPIC",
     "/world/iris_runway/model/iris_with_gimbal/model/gimbal"
-    "/link/pitch_link/sensor/camera/image"
+    "/link/pitch_link/sensor/camera/image",
 )
 
 # gz::msgs::PixelFormatType values we decode

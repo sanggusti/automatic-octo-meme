@@ -224,3 +224,6 @@ runs/
 logs/
 .inspect-data/
 .inspect-logs/
+assets/models/
+# FIRMS archive: the zip is committed; the extracted CSV (30 MB) regenerates.
+data/firm/*.csv
