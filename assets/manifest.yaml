@@ -17,6 +17,43 @@ vegetation:
     generator: procedural canopy-sphere SDF (place_trees.py --bushes)
     license: generated (no external file)
     use: T1 underbrush; no suitable Fuel bush found (2026-10-29 spike)
+  canopy-broadleaf:
+    url: https://fuel.gazebosim.org/1.0/facugu123/models/Tree/7/Tree.zip
+    version: 7
+    sha256: e6c082e6b8eb7f9a3c2fc190ac78c801ce30af54e41ee0f9f7b0a4ad1be9f547
+    license: CC-BY-4.0
+    use: RETIRED 2026-11-04 -- renders as a 2.6 m leafless white skeleton even with textures resolved; Blender-export quirks beyond texture names. Replacement broadleaf hunt in progress.
+  grass-plane:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Grass%20Plane/2/Grass%20Plane.zip
+    version: 2
+    sha256: 962880f4818647f9a7ed609a896bce07ee430fc4755dbabbbee28dfde4ff1703
+    license: CC-BY-4.0
+    use: RETIRED 2026-11-04 -- single instance sprawls ~500 m of plane visuals and renders black under ogre2; not a tuft
+  grasspatch:
+    url: https://fuel.gazebosim.org/1.0/hexarotor/models/grasspatch/1/grasspatch.zip
+    version: 1
+    sha256: 23d8b5eac474368b57d1bea9f831d5bf04ac39e45d7b311422434ad43b0a5d6b
+    license: CC-BY-4.0
+    use: RETIRED 2026-11-04 -- plane-based visuals render black under ogre2; understory needs a mesh-based tuft asset
+emitters:
+  fog-emitter:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Fog%20Emitter/5/Fog%20Emitter.zip
+    version: 5
+    sha256: 70cec7732161fce93815059780c6099d48c46c923f6a9cb7de6bd593dbfa45e4
+    license: CC-BY-4.0
+    use: T1 smoke column particle config + fog.png ramp (structure reused in world emitters)
+  fog-emitter-dense:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Fog%20Emitter%20Dense/2/Fog%20Emitter%20Dense.zip
+    version: 2
+    sha256: 8a28b71eadf2055c661d0dfdf395a0f35f490bf6ad65d7284ac943fd0f189fd8
+    license: CC-BY-4.0
+    use: T1 dense smoke particle config + fog ramp; haze bank base
+  smoke-generator:
+    url: https://fuel.gazebosim.org/1.0/caguero/models/smoke_generator/2/smoke_generator.zip
+    version: 2
+    sha256: 5170fd23e85a083ad10aae18f6d446d908ec0110d4b595f8379d832e26dd1493
+    license: CC-BY-4.0
+    use: T1 smoke texture (smoke.png) + emitter numerics; Harmonic ignores model plugin blocks so build_world.py rehosts the model's own params in SDF particle_emitter elements. Smoke rate/size/lifetime tuned for column continuity (30/2m/2.5s); flames are a compact fireball (orange diffuse, 40/s, 2m, 0.8s, 3-5m/s) for the fire-vs-smoke read (documented adaptations).
 actors:
   standing-person:
     url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Standing%20person/3/Standing%20person.zip

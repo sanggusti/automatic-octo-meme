@@ -128,6 +128,22 @@ def build_samples(
     ``time_of_day`` likewise selects visibility (``time_of_day_active``).
     """
     config = load_scenario(scenario, scenarios_dir)
+    firms_meta = None
+    firms = config.raw.get("firms")
+    if firms:
+        firms_meta = {
+            "anchor": firms["anchor"],
+            "t0": firms["t0"],
+            "source": firms["source"],
+            "window_m": firms["window_m"],
+            "frp_mean": firms["frp_mean"],
+            "frp_max": firms["frp_max"],
+            "ign_cells": sorted(
+                [d["x"], d["y"]]
+                for d in config.raw["dynamics"]["fire"]["ignition"]
+            ),
+            "ref_new_cells": [list(c) for c in firms["ref_new_cells"]],
+        }
     if weather is not None and weather not in config.weather:
         raise ValueError(
             f"Weather {weather!r} not in {scenario} options {config.weather}"
@@ -179,6 +195,7 @@ def build_samples(
                         }
                     ),
                     "world_hash": world_hash(scenario, seed, placements),
+                    **({"firms": firms_meta} if firms_meta else {}),
                 },
             )
         )

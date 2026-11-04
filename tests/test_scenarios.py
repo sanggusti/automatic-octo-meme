@@ -4,6 +4,9 @@ from dmb.scenarios import build_samples, list_scenarios, load_scenario, world_ha
 def test_all_scenarios_load():
     assert sorted(list_scenarios()) == [
         "earthquake",
+        "firms_peat_kalimantan_01",
+        "firms_peat_sumatra_01",
+        "firms_peat_sumatra_02",
         "flash_flood",
         "flood",
         "forest_fire",
