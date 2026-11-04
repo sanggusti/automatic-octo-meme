@@ -177,6 +177,11 @@ Get-Process Blocks-Win64-DebugGame -ErrorAction SilentlyContinue | Stop-Process 
 
 ## 7. Forest-fire env (issue #50, operator legs)
 
+New-env walkthrough with all gotchas: `docs/custom-env-guide.md`
+(toolchain, map generation, packaging, flight rules, troubleshooting
+matrix with screenshots). Whiteout bisect record:
+`docs/forest-fire-whiteout.md`.
+
 Code-complete in-repo; live legs need the #46 toolchain (UE 5.6 +
 Colosseum source build). The PC's UE 5.8.4
 (`D:\Epic Games\UE_5.8`, verified 2026-11-02) cannot build Colosseum —
@@ -191,3 +196,84 @@ install UE 5.6 alongside, do not upgrade the env to 5.8.
 4. Capture before-variant reference keyframes (one per visual-target
    phase in `unreal/forest_fire/VISUAL_TARGET.md`) into the issue.
 5. Update `docs/specs.md` (env binary + pins) in the closing PR.
+
+## 8. Peatforest env (issues #64/#65/#66, as-run 2026-11-03)
+
+Real-data peatland maps (`PeatBefore` lush / `PeatBurning` charred +
+fire). Full record: `docs/peatforest-report.md` (tile reasoning, pins,
+seeds, counts, frame time, spawn/bounds, deviations, bug bisects).
+
+1. Prep (pinned data in `assets/manifest.yaml`, `gis:`):
+   `prep_tile.py --out data/peatforest/ue_inputs`,
+   `gen_terrain.py --seed 7 --out data/peatforest/ue_gen`,
+   `gen_groves.py --gen ... --out ...`, stage to
+   `<project>/inputs/peatforest/`.
+2. Build each map (`DMB_MAPS=before|burning`):
+   `UnrealEditor-cmd.exe ForestFire.uproject -run=pythonscript
+   -script=unreal/peatforest/tools/ue_build_peat.py -unattended
+   -nopause -nosplash`; verdict lands in
+   `<project>/Saved/PeatBuild_OK.txt`. Under a shell sandbox these
+   runs need one-shot escalation (DDC + project writes are blocked).
+3. Package: RunUAT `BuildCookRun ... -cook -build -stage -pak
+   -archive -archivedirectory=ForestFire-Pkg` (stop any running game
+   first — it locks the `.ucas` stage copy).
+4. Fly: `ForestFire.exe PeatBurning -RenderOffScreen -ResX=1280
+   -ResY=720`, MAIN PythonClient, RPC 41451. Spawn = tile SW corner
+   (NED origin); bounds x,y in `[0,2000]` m; 5 m/cell grid.
+5. Eval: `runs/peat_eval.py mock` (no game) then `both` (game up);
+   expect mock/bridge match, recall ~0.5, safety 1.0.
+6. Hi-fi v1 (structure landed, fidelity open — see report):
+   `gen_textures.py` (leaf/flame/smoke alpha), `gen_groves.py` v2
+   (4 variants + charred), stage `tex/` + `assets_raw/` (PBR pins)
+   beside `ue_gen`, `DMB_MAPS=both` build. Materials need
+   `used_with_nanite` (no `b_` prefix) or Nanite meshes render
+   default-gray. Never connect `MaterialExpressionVertexColor`
+   (editor access-violation crash, 3x).
+7. Gotchas that cost a day: (a) the shell sandbox blocks LOOPBACK
+   TCP — in-sandbox RPC clients die with WinError 10013 masked as
+   "port never opened" while the game LISTENs fine. Run every
+   survey/RPC/game command escalated. (b) Kill games BY NAME
+   (bootstrap + inner exe): a stale inner holds 41451 and the next
+   boot bind-fails into an invisible headless modal that blocks the
+   game thread. (c) AirSim `LogMessage` is screen-only — RPC
+   startup failures never reach the packaged log.
+8. Collision verdict (bisected live 2026-11-04, shell WORKS -- the
+   "fall-through" was three stacked misreads): (a) rest center reads
+   surface + 1.31 m (pawn collision extent below the reported origin;
+   verified to the cm at two sites, slow 0.3 and fast 1.5 m/s legs,
+   no tunneling). Never expect center ~= surface. (b) simGetCollisionInfo
+   RPC calls getCollisionInfoAndReset -- has_collided resets on EVERY
+   read, so level-polling flashes True once then False while resting;
+   touchdown = fresh time_stamp + 3 s z-stall (runs/peat_survey.py
+   section 4). (c) Tile relief spans NED -14.2..-1.3 m, so rest depths
+   vary by site -- compare against heights.json, not a constant.
+   (d) The PeatPad bisect plate landed coplanar with the shell (same
+   height), so it cannot discriminate pad-vs-shell; the (100,100)
+   probe 40 m off-pad blocking identically is the shell proof.
+9. Lumen hangs packaged loads on 10M-tri maps (bisected v3:
+   Nanite-off still hangs, Lumen-off loads, null-RHI loads).
+   Bake `[ConsoleVariables] r.DynamicGlobalIlluminationMethod=0
+   + r.ReflectionMethod=0` into DefaultEngine.ini (the
+   RendererSettings property spellings did NOT take). Verify
+   with a no-flags launch + census, never assume.
+10. Build all maps in ONE editor session (DMB_MAPS=both). Split
+    sessions rot the FIRST map\'s ribbon refs (white dashes,
+    pale 0.19) via delete-recreate staleness; single session
+    fixed it (pale 0.0002). verify_map reload-asserts guard the
+    classic empty-first-save, so keep them.
+11. Clean-cook after ANY merged-mesh size change. A 10x-shrunk
+    charred mesh + bigger fire rig sailed the incremental cook
+    and then hung every Burning load; clean cook fixed it
+    (182 actors). Incremental is fine for materials/lights only.
+12. Never reset() mid-transition: poll simListSceneObjects
+    until the target census (Before 41 / Burning 182), settle
+    30 s, THEN reset. Resetting into a transition bricks RPC
+    (game alive, server dead) and costs a relaunch.
+13. Census-assert every launch (staticmesh <40 = PeatBefore,
+    not the 301-actor fallback). The CLI map arg never resolves
+    Peat (short names miss /Game/Peat/, leading / parses as a
+    switch); GameDefaultMap=PeatBefore + simLoadLevel full path
+    is the working combo.
+14. -RenderOffScreen pegs the GPU at 99% idle (no present wait;
+    t.MaxFPS did not cap it). Kill the game between bursts;
+    never leave it rendering while afk.
