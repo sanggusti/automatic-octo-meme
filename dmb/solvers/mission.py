@@ -47,18 +47,26 @@ def drone_mission() -> Solver:
         elif perception == "sam":
             from dmb.perception.sam import (  # noqa: PLC0415
                 SAMEdgePerception,
+                hazard_point_proposer,
                 ignition_point_proposer,
                 max_scans_from_env,
                 sam_from_env,
             )
 
+            scenario = str(md.get("scenario", ""))
+            if scenario == "earthquake_hard":
+                proposer = hazard_point_proposer(bridge, "rubble")
+            elif scenario == "landslide_hard":
+                proposer = hazard_point_proposer(bridge, "debris")
+            else:
+                proposer = ignition_point_proposer(bridge)
             edge = SAMEdgePerception(
                 bridge,
                 TriggerConfig(time_of_day=str(tod)),
                 FrameBudget(max_snapshots=8),
                 sam_from_env(),
                 max_scans=max_scans_from_env(),
-                point_proposer=ignition_point_proposer(bridge),
+                point_proposer=proposer,
                 fuse_stub=settings.sam_fuse_stub,
             )
         else:

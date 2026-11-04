@@ -7,8 +7,8 @@ pre-rendered frames -- with their exact survey camera geometry -- to
 SAM scans on firms scenarios, so the SAM-vs-stub comparison measures
 segmentation on real 3D renders instead of SAM-blind map art.
 
-Layout under the frames root (default docs/firms-sim2real/renders/,
-override DMB_RENDER_FRAMES_DIR):
+Layout under the frames roots (default docs/firms-sim2real/renders/
+then docs/quake-slide-sim2real/renders/, override DMB_RENDER_FRAMES_DIR):
   survey-<scenario>-<seed>-nadir.png   the Map POV frame
   survey-<scenario>-<seed>-nadir.json  camera sidecar (see below)
 
@@ -34,24 +34,30 @@ class SurveyFrame:
     pose: DronePose
 
 
-def frames_root() -> Path:
+def frames_roots() -> list[Path]:
     override = os.environ.get("DMB_RENDER_FRAMES_DIR", "").strip()
     if override:
-        return Path(override)
-    return (
-        Path(__file__).resolve().parents[2]
-        / "docs"
-        / "firms-sim2real"
-        / "renders"
-    )
+        return [Path(override)]
+    docs = Path(__file__).resolve().parents[2] / "docs"
+    return [
+        docs / "firms-sim2real" / "renders",
+        docs / "quake-slide-sim2real" / "renders",
+    ]
+
+
+def frames_root() -> Path:
+    return frames_roots()[0]
 
 
 def survey_frame(scenario: str, seed: int) -> SurveyFrame | None:
     """Load the survey frame + camera for (scenario, seed), if present."""
-    base = frames_root() / f"survey-{scenario}-{seed}-nadir"
-    png_path = base.with_suffix(".png")
-    js_path = base.with_suffix(".json")
-    if not png_path.exists() or not js_path.exists():
+    for root in frames_roots():
+        base = root / f"survey-{scenario}-{seed}-nadir"
+        png_path = base.with_suffix(".png")
+        js_path = base.with_suffix(".json")
+        if png_path.exists() and js_path.exists():
+            break
+    else:
         return None
     spec = json.loads(js_path.read_text())
     cam = CameraModel(

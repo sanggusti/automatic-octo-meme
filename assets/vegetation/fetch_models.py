@@ -16,7 +16,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-MANIFEST_SECTIONS = ("vegetation", "emitters", "actors")
+MANIFEST_SECTIONS = ("vegetation", "emitters", "actors", "structures")
 
 
 def manifest_entries(manifest_path: Path) -> dict[str, dict]:
@@ -74,6 +74,10 @@ def create_aliases(models_dir: Path) -> list[str]:
     import re  # noqa: PLC0415
     import xml.etree.ElementTree as ET  # noqa: PLC0415
 
+    # Clear stale aliases first (regeneration is deterministic).
+    for stale in sorted(models_dir.iterdir()):
+        if stale.is_symlink():
+            stale.unlink()
     aliases = []
     for target in sorted(models_dir.iterdir()):
         if target.is_symlink() or not target.is_dir():
@@ -86,12 +90,13 @@ def create_aliases(models_dir: Path) -> list[str]:
         for sdf in target.glob("*.sdf"):
             for ref in re.findall(r"model://([^/<\"]+)", sdf.read_text()):
                 spellings.add(ref.strip())
-        for spelling in spellings - {"", target.name}:
+        for spelling in sorted(spellings - {"", target.name}):
             link = models_dir / spelling
             if link.is_symlink() or link.exists():
-                link.unlink() if link.is_symlink() else None
-                if link.exists() and not link.is_symlink():
-                    continue
+                # First writer wins: house-2's SDF legacy-refs
+                # model://house_1 (shared texture pack) and must not
+                # steal the alias from house-1 (Error 14, 2026-11-04).
+                continue
             link.symlink_to(target.name)
             aliases.append(spelling)
     return aliases

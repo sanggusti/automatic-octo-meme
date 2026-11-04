@@ -92,6 +92,27 @@ textures:
     sha256: d5cde28f8a7ad34ab3dcea8dc0f4ed836c16688e96c40695c760dfb052b46e89
     license: CC0-1.0
     use: scorch decals under fire clusters. Same fetch/stage path as aerial_grass_rock.
+  asphalt_02:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/asphalt_02/asphalt_02_diff_4k.jpg
+    sha256: d1601354507b6c4a46aa741b9134f9f23f738596a2bdcd20792e50ca554018e0
+    license: CC0-1.0
+    use: quake town street grid albedo (urban asphalt; matches Japan rubble-street ref).
+  brown_mud_leaves_01:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/brown_mud_leaves_01/brown_mud_leaves_01_diff_4k.jpg
+    sha256: bfca3a9db391ac14750705d6903daaf09e221baa2e60e97836efb8a4d3e230a4
+    license: CC0-1.0
+    use: RETIRED 2026-11-04 -- close-up leaf litter scales to 2-3 m salad at 240 m single-stretch (slide render); kept pinned for future close-up use.
+  brown_mud_02:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/brown_mud_02/brown_mud_02_diff_4k.jpg
+    sha256: 9477cb889f26c131c411a771cf057319738f857c6b7288747430122779106da5
+    license: CC0-1.0
+    use: landslide debris-flow ground albedo (dark wet churned mud; fine grain survives aerial single-stretch).
+  rock_face_03:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/rock_face_03/rock_face_03_diff_4k.jpg
+    sha256: 83148536c125cee3a2e2fc1368c8851ad4c87aef8b8bb35c5129d82d223effb3
+    license: CC0-1.0
+    use: landslide exposed-scar rock albedo (head-scarp zone above the mud flow).
+
 gis:
   # Peatforest tile C (#64): bbox [114.318, -2.86, 114.336, -2.842].
   # Files live in data/peatforest/ (untracked bulk); pins reference
@@ -161,3 +182,112 @@ pbr:
     sha256: be83310cad64d23539e628f14525af651a03646f5a1cc6029bd19a9446ea72f9
     license: CC0-1.0
     use: burn-scar ground patches at hotspots
+structures:
+  collapsed-house:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Collapsed%20House/4/Collapsed%20House.zip
+    version: 4
+    sha256: d9fa35138a389e6fbd84be3a293320a0acf9b17f9f1a9e0b2f7a2a28acac9c42
+    license: CC0-1.0
+    use: quake collapsed homes (rubble core)
+  house-1:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/House%201/3/House%201.zip
+    version: 3
+    sha256: 7c3e233226d8b80587a1da62397ec15cad271d99b9a9a22d9bc05a4ff86474b7
+    license: CC0-1.0
+    use: quake standing house variant A
+  house-2:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/House%202/3/House%202.zip
+    version: 3
+    sha256: 47f345d8817b55e669052a65a2aed1b494d3bafd0c1001a1ae9a15c849c75ba5
+    license: CC0-1.0
+    use: quake standing house variant B / slide at-risk homes
+  apartment:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Apartment/3/Apartment.zip
+    version: 3
+    sha256: 06a7d5c2d2481473345a6eaf50744ed4a024e1ae9e8dabffdf1808641e9e97a9
+    license: CC0-1.0
+    use: quake mid-rise standing
+  collapsed-industrial-building:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Collapsed%20industrial%20building/3/Collapsed%20industrial%20building.zip
+    version: 3
+    sha256: 896ff65311fc67b4f79142223c36ad51b92bb645be4f20cbc71705a1c8a04f81
+    license: CC0-1.0
+    use: quake big collapse
+  fire-station-collapsed:
+    url: https://fuel.gazebosim.org/1.0/chapulina/models/Fire%20station%20%28collapsed%29/2/Fire%20station%20%28collapsed%29.zip
+    version: 2
+    sha256: 69e2345c7c1d234f17123521c315515be86bf8846fb6bc2ed23c3fce810f2a36
+    license: CC-BY-4.0
+    use: quake landmark collapse
+  urban-wall-debris:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Urban%20Wall%20Debris/3/Urban%20Wall%20Debris.zip
+    version: 3
+    sha256: a1e695e94e7fcbb54b587a523016ec2b6622b031b662abbc5fcdc215309afdf4
+    license: CC-BY-4.0
+    use: quake street rubble A
+  tunnel-wall-debris:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Tunnel%20Wall%20Debris/2/Tunnel%20Wall%20Debris.zip
+    version: 2
+    sha256: 451eac5e5a8e8145c9c3faaececc16e1e47b0cea2eae58d74d33d59555c25558
+    license: CC-BY-4.0
+    use: quake street rubble B
+  jersey-barrier:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Jersey%20Barrier/6/Jersey%20Barrier.zip
+    version: 6
+    sha256: 8b813dbb19a9c5c24f426d03e389f83d9c37fa5eaf0380e3539929275b8fb0ea
+    license: CC0-1.0
+    use: quake cordon
+  ambulance:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Ambulance/4/Ambulance.zip
+    version: 4
+    sha256: ddd47ff6f2942436c36f42123a6d408cb84aa9554920f7b4f82c784d4732046e
+    license: CC0-1.0
+    use: quake response vehicle
+  tent:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/tent/4/tent.zip
+    version: 4
+    sha256: 526512042c0526e6679873a9a33a96ec641866ecc250ecf4e8c8f471161358fe
+    license: CC-BY-4.0
+    use: relief camp / evac post
+  prius-hybrid:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Prius%20Hybrid/3/Prius%20Hybrid.zip
+    version: 3
+    sha256: ea5d10f1a2c4e89f8a0441f2c9e623575ecd9a7670c81c3f23bb9204ca32b1ab
+    license: CC0-1.0
+    use: quake street cars / slide buried cars
+  falling-rock-1:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Falling%20Rock%201/6/Falling%20Rock%201.zip
+    version: 6
+    sha256: 88b38504a76db87266409d658006fe18eb3220937bb0de2d90e945cc0e1ee317
+    license: CC-BY-4.0
+    use: slide debris boulder variant
+  falling-rock-2:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Falling%20Rock%202/6/Falling%20Rock%202.zip
+    version: 6
+    sha256: b3bc4d85ae3f2b5ed4dff70b67c0ade3e6e492798420247d40a2d995a539bcd1
+    license: CC-BY-4.0
+    use: slide debris boulder variant
+  falling-rock-3:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Falling%20Rock%203/6/Falling%20Rock%203.zip
+    version: 6
+    sha256: 17356f5f9dddf74d94c2a3b5ef45064a173514b82e5b4654e8923a5bbf9753e1
+    license: CC-BY-4.0
+    use: slide debris boulder variant
+  falling-rock-4:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Falling%20Rock%204/9/Falling%20Rock%204.zip
+    version: 9
+    sha256: cc98eec9f8936aaf35f4e09f51a39a4ac51ea7b6956e22916db77071efca6c1d
+    license: CC-BY-4.0
+    use: slide debris boulder variant
+  falling-rock-5:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Falling%20Rock%205/6/Falling%20Rock%205.zip
+    version: 6
+    sha256: c90e24da98507e8f1c830a4b8fbd3ab74836dff8d886e5a98c6de78b0fb44594
+    license: CC-BY-4.0
+    use: slide debris boulder variant
+  falling-rock-6:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Falling%20Rock%206/5/Falling%20Rock%206.zip
+    version: 5
+    sha256: 0024d723c7089b8371a6c559bfd69b63d4a3086c10d38208927b2d4d53b7c3fd
+    license: CC-BY-4.0
+    use: slide debris boulder variant
