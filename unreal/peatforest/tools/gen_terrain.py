@@ -31,7 +31,7 @@ BBOX = (114.318, -2.86, 114.336, -2.842)
 SPAN_M = 2000.0
 GRID_N = 500  # 4 m terrain grid
 ALBEDO_N = 2048
-MAX_TREES = 4000
+MAX_TREES = 16000
 UNDERSTORY_PER_TREE = 0  # understory deferred to foliage pass
 
 
@@ -127,7 +127,19 @@ def main() -> None:
     # change, but brown clearings would render slate-blue).
     alb = windowed(data / "s2_20191023_T50MKB_visual.tif",
                    size=ALBEDO_N, resampling=Resampling.bilinear)
-    arr = np.moveaxis(alb, 0, -1).astype("uint8")[:, :, ::-1]
+    arr = np.moveaxis(alb, 0, -1).astype("uint8")
+    # Forest-floor tint: haze-season S2 reads desert-brown even under
+    # dense stands, so the forest vanishes from altitude. Blend
+    # WorldCover forest pixels toward dark leaf-litter floor (RGB,
+    # pre BGR-swap). Still 55% real S2.
+    wc_pre = windowed(data / "worldcover_2021_S03E114.tif",
+                      resampling=Resampling.nearest)[0]
+    fmask = np.array(Image.fromarray(
+        (wc_pre == 10).astype("uint8") * 255).resize(
+        (ALBEDO_N, ALBEDO_N), Image.NEAREST)) > 0
+    f = arr.astype(np.float32)
+    f[fmask] = f[fmask] * 0.55 + np.array([46, 62, 36], np.float32) * 0.45
+    arr = f.astype("uint8")[:, :, ::-1]
     Image.fromarray(np.ascontiguousarray(arr)).save(out / "albedo_2k.png")
 
     # Tree placements: forest-mask pixels + clumping noise, seeded shuffle.
@@ -149,11 +161,23 @@ def main() -> None:
                 + lat[y0 + 1][x0 + 1] * sx * sy)
 
     cands = []
+    acc_px = []
     for y, x in zip(forest_ys.tolist(), forest_xs.tolist()):
         if noise(x / wn, y / hn) > 0.35:
             # Jitter inside the 10 m pixel, keep clear of spawn corner.
             ex = (x + rng.random()) / wn * SPAN_M
             ny = (1.0 - (y + rng.random()) / hn) * SPAN_M
+            if ex > 15.0 or ny > 15.0:
+                cands.append((round(ex, 1), round(ny, 1)))
+                acc_px.append((x, y))
+    # Lush pass: 2 more trees per accepted forest pixel on a SEPARATE
+    # RNG stream, so main-stream consumption (paths/canals downstream)
+    # stays bit-identical to the 4000-tree layout.
+    trng = random.Random(args.seed ^ 0x7EE5)
+    for x, y in acc_px:
+        for _ in range(2):
+            ex = (x + trng.random()) / wn * SPAN_M
+            ny = (1.0 - (y + trng.random()) / hn) * SPAN_M
             if ex > 15.0 or ny > 15.0:
                 cands.append((round(ex, 1), round(ny, 1)))
     # Hidden-path network (eval: find the paths, score discovery).
@@ -208,16 +232,23 @@ def main() -> None:
                 + dem[y0 + 1, x0] * (1 - tx) * ty
                 + dem[y0 + 1, x0 + 1] * tx * ty)
 
+    # Mitered ribbons: per-node averaged direction (shared verts per
+    # node, so bends never gap into dashes); UP winding (a,c,b),(b,c,d)
+    # with explicit +Z normals (importer-computed ribbon normals lit
+    # unpredictably bright); 1 UV tile per 2.5 m (square texels).
     plines = ["# peatforest hidden paths (DMB eval)"]
-    pvt, arc = [], 0.0
+    pvt, pvn, arc = [], [], 0.0
     for path in paths:
-        prev, pdir = None, (1.0, 0.0)
+        n = len(path)
+        dirs = []
+        for i in range(n):
+            ax, ay = path[max(0, i - 1)]
+            bx, by = path[min(n - 1, i + 1)]
+            L = math.hypot(bx - ax, by - ay) or 1.0
+            dirs.append(((bx - ax) / L, (by - ay) / L))
+        prev = None
         for i, (x, y) in enumerate(path):
-            if i + 1 < len(path):
-                dx, dy = path[i + 1][0] - x, path[i + 1][1] - y
-                L = math.hypot(dx, dy) or 1.0
-                pdir = (dx / L, dy / L)
-            px, py = -pdir[1], pdir[0]  # left normal
+            px, py = -dirs[i][1], dirs[i][0]  # joint normal
             if prev is not None:
                 arc += math.hypot(x - prev[0], y - prev[1])
             prev = (x, y)
@@ -225,15 +256,16 @@ def main() -> None:
                 ex, ny_ = x + px * s, y + py * s
                 h = dem_at(ex, ny_) * 100.0 + 15.0
                 plines.append(f"v {ny_ * 100.0:.1f} {-ex * 100.0:.1f} {h:.1f}")
-                pvt.append(f"vt {arc / 50.0:.4f} {vv:.1f}")
-    plines += pvt
+                pvt.append(f"vt {arc / 2.5:.4f} {vv:.1f}")
+                pvn.append("vn 0.0000 0.0000 1.0000")
+    plines += pvt + pvn
     # Two verts per node; faces per consecutive node pair per path.
     vi = 1
     for path in paths:
         for _ in range(len(path) - 1):
             a, b, c, d = vi, vi + 1, vi + 2, vi + 3
-            plines += [f"f {a}/{a} {b}/{b} {c}/{c}",
-                       f"f {b}/{b} {d}/{d} {c}/{c}"]
+            plines += [f"f {a}/{a}/{a} {c}/{c}/{c} {b}/{b}/{b}",
+                       f"f {b}/{b}/{b} {c}/{c}/{c} {d}/{d}/{d}"]
             vi += 2
         vi += 2
     (out / "paths.obj").write_text("\n".join(plines) + "\n")

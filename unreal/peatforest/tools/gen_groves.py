@@ -1,7 +1,7 @@
 """Hi-fi grove generator: 4 seeded variants + charred snags (#65).
 
 Reads ue_gen/{placements,heights}.json + ../firms_tileC.json (hotspot
-burn mask, 250 m). Writes merged per-material OBJs with UVs + vertex
+burn mask, 80 m). Writes merged per-material OBJs with UVs + vertex
 tints (v x y z r g b, f v/vt), Z-up, y=-east_cm (import negates Y):
 
   trunk.obj    all trunks + palm trunks + branches (bark PBR)
@@ -20,7 +20,7 @@ import random
 from pathlib import Path
 
 SIDES = 10
-HOTSPOT_R_M = 250.0
+HOTSPOT_R_M = 80.0  # tight scars: fire sits IN forest, not in a 250 m clearing
 
 
 class Part:
@@ -101,8 +101,11 @@ def blob(part, cx, cy, cz, rx, ry, rz, tint, seed_ang=0.0, detail=(12, 7)):
                                   normed(dx / (rx * rx), dy / (ry * ry),
                                          dz / (rz * rz))))
         grid.append(ring)
-    top = part.vert(cx, cy, cz + rz, 2.0, 2.0, tint, (0.0, 0.0, 1.0))
-    bot = part.vert(cx, cy, cz - rz, 2.0, 0.0, tint, (0.0, 0.0, -1.0))
+    # Cap fans share their ring's v: (2.0, 2.0) stretched the whole card
+    # over the pole into a pale disc (live v3).
+    top = part.vert(cx, cy, cz + rz, 2.0, 2.0 / nlat, tint, (0.0, 0.0, 1.0))
+    bot = part.vert(cx, cy, cz - rz, 2.0, 2.0 * (nlat - 1) / nlat,
+                    tint, (0.0, 0.0, -1.0))
     for i in range(nlon):
         part.tri(grid[0][i], grid[0][(i + 1) % nlon], top)
     for r in range(len(grid) - 1):

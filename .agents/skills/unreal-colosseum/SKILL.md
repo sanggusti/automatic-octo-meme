@@ -122,6 +122,35 @@ escalated too, and make wait-loops re-raise PermissionError distinctly.
   `MaterialExpressionVertexColor`: it access-violates the editor
   (3x, even RGBA source). Bake tints into textures or use constants.
 
+## Packaged-build laws (peatforest v3, all bisected live)
+
+- Lumen hangs packaged map loads past ~10M tris (Nanite-off still
+  hangs, Lumen-off loads, null-RHI loads). Bake
+  `[ConsoleVariables] r.DynamicGlobalIlluminationMethod=0` +
+  `r.ReflectionMethod=0` into DefaultEngine.ini (the
+  RendererSettings property spellings do NOT take) and re-verify
+  with a no-flags launch + census.
+- Build all maps in ONE `-cmd` session after ONE import pass.
+  Split sessions rot the first map's ribbon refs via
+  delete-recreate staleness (white dashes); single session +
+  reload-verify fixed it. verify_map reload-asserts guard the
+  classic empty-first-save.
+- Clean-cook (`Saved/Cooked` + `Saved/StagedBuilds`) after ANY
+  merged-mesh size change. Incremental cook sailed a 10x-shrunk
+  mesh and the map hung every load; clean cook fixed it.
+  Incremental is for materials/lights only.
+- Census-assert every boot: PeatBefore = 41 actors / 13 staticmesh.
+  301 staticmesh = the GameDefaultMap fallback (CLI map args never
+  resolve /Game/Peat/: short names miss, leading / parses as a
+  switch). Working combo: GameDefaultMap=PeatBefore + simLoadLevel
+  full path for the other map.
+- Never `reset()` mid-transition: poll the census to the target
+  count, settle 30 s, then reset. Resetting into a transition
+  bricks RPC (game alive, server dead). Skip simLoadLevel when
+  the census already shows the target map.
+- `-RenderOffScreen` pegs the GPU at 99% even idle (t.MaxFPS does
+  not cap it). Kill the game between bursts.
+
 ## Verify on packaged builds, not `-game`
 
 The cook is the only place material shaders actually compile, and `-game`

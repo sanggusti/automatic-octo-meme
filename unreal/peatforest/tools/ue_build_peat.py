@@ -169,6 +169,12 @@ def make_materials(data):
         node.set_editor_property("r", float(v))
         return node
 
+    def const3(mat, r, g, b):
+        node = lib.create_material_expression(
+            mat, unreal.MaterialExpressionConstant3Vector)
+        node.set_editor_property("constant", unreal.LinearColor(r, g, b, 1.0))
+        return node
+
     def mul(mat):
         return lib.create_material_expression(
             mat, unreal.MaterialExpressionMultiply)
@@ -221,6 +227,8 @@ def make_materials(data):
                                           "T_Peat_leaf_card", wrap=True)
     proctex["clouds"] = import_texture(os.path.join(tx, "clouds.png"),
                                        "T_Peat_clouds", wrap=True)
+    proctex["dirt_flat"] = import_texture(os.path.join(tx, "dirt_flat.png"),
+                                        "T_Peat_dirt_flat", wrap=True)
     raw = data["pbr"]
     bark = import_texture(os.path.join(raw, "bark_diff.jpg"), "T_Peat_Bark",
                           wrap=True)
@@ -349,14 +357,12 @@ def make_materials(data):
     _finish_mat("M_Peat_Burn")
     mats["burn"] = mat
 
-    # Path: dirt track (mud squared = darker; two-sided because
-    # ribbon winding follows path direction).
+    # Path: dirt track (flat brown swatch; constant-vector base colors
+    # render unpredictably bright live, so colors go through textures).
+    # Two-sided because ribbon winding follows path direction.
     mat = _new_mat("M_Peat_Path")
-    m = mul(mat)
-    pnode = sample(mat, mud)
-    assert lib.connect_material_expressions(pnode, "RGB", m, "A")
-    assert lib.connect_material_expressions(pnode, "RGB", m, "B")
-    out(mat, m, "", MP.MP_BASE_COLOR, "path")
+    out(mat, sample(mat, proctex["dirt_flat"]), "RGB", MP.MP_BASE_COLOR,
+        "path")
     # Dirt is matte: default specular mirror-blows at grazing angles.
     out(mat, const(mat, 0.0), "", MP.MP_SPECULAR, "path-spec")
     out(mat, const(mat, 0.95), "", MP.MP_ROUGHNESS, "path-rough")
@@ -474,25 +480,33 @@ def build_map(name, data, mats, meshes, burning):
             ny = (f["lat"] - -2.86) * 110540.0
             gz = sample_height(data["heights"], ex, ny)
             ux, uy = ny * 100.0, ex * 100.0
-            # Big fire: nested tongue cones + tall smoke columns.
-            for fz, fs in ((150.0, (6.5, 6.5, 3.0)),
-                           (460.0, (3.6, 3.6, 5.2)),
-                           (520.0, (2.2, 2.2, 6.0))):
+            # BIG fire (visual override): tall nested core + satellite
+            # tongues around the front + a high smoke stack. 7 flames +
+            # 4 smoke per hotspot.
+            for fz, fs in ((150.0, (8.0, 8.0, 5.0)),
+                           (600.0, (5.0, 5.0, 8.0)),
+                           (900.0, (3.0, 3.0, 10.0))):
                 spawn_mesh((ux, uy, gz + fz), meshes["cone"], mats["flame"],
                            fs, collide=False)
                 stats["flames"] += 1
+            for ox, oy in ((1200.0, 0.0), (-1200.0, 0.0),
+                           (0.0, 1200.0), (0.0, -1200.0)):
+                spawn_mesh((ux + ox, uy + oy, gz + 150.0), meshes["cone"],
+                           mats["flame"], (4.5, 4.5, 6.0), collide=False)
+                stats["flames"] += 1
             # Smoke rides ABOVE the flame cores: enclosing them in an
             # opaque-ish box hid the fire entirely (diagnosed live v2.4).
-            spawn_mesh((ux, uy, gz + 1000.0), meshes["cube"], mats["smoke"],
-                       (3.5, 3.5, 9.0), collide=False)
-            stats["smoke"] += 1
-            spawn_mesh((ux, uy, gz + 1700.0), meshes["cube"], mats["smoke"],
-                       (5.5, 5.5, 14.0), collide=False, yaw=30.0)
-            stats["smoke"] += 1
+            for sz, ss, yaw in ((800.0, (3.0, 3.0, 7.0), 0.0),
+                                (1400.0, (4.5, 4.5, 11.0), 20.0),
+                                (2200.0, (6.5, 6.5, 17.0), 45.0),
+                                (3200.0, (8.5, 8.5, 22.0), 70.0)):
+                spawn_mesh((ux, uy, gz + sz), meshes["cube"], mats["smoke"],
+                           ss, collide=False, yaw=yaw)
+                stats["smoke"] += 1
             spawn_mesh((ux, uy, gz + 40.0), meshes["plane"], mats["burn"],
-                       (18.0, 18.0, 1.0), collide=False)
+                       (30.0, 30.0, 1.0), collide=False)
             spawn_mesh((ux, uy, gz + 55.0), meshes["plane"], mats["glow"],
-                       (5.0, 5.0, 1.0), collide=False)
+                       (7.0, 7.0, 1.0), collide=False)
             # Fire light: orange point glow, no shadows (10 shadow-casting
             # point lights would tank the frame budget).
             lamp = unreal.EditorLevelLibrary.spawn_actor_from_class(
@@ -501,8 +515,8 @@ def build_map(name, data, mats, meshes, burning):
             lamp.set_actor_label("FireLight")
             plc = lamp.get_component_by_class(unreal.PointLightComponent)
             plc.set_mobility(unreal.ComponentMobility.MOVABLE)
-            plc.set_editor_property("intensity", 3500.0)
-            plc.set_editor_property("attenuation_radius", 3500.0)
+            plc.set_editor_property("intensity", 6000.0)
+            plc.set_editor_property("attenuation_radius", 5000.0)
             plc.set_editor_property("light_color",
                                     unreal.Color(255, 120, 30, 255))
             plc.set_editor_property("cast_shadows", False)
@@ -570,7 +584,7 @@ def build_map(name, data, mats, meshes, burning):
     sky_light.set_actor_label("SkyFill")
     sky_comp = sky_light.get_component_by_class(unreal.SkyLightComponent)
     sky_comp.set_mobility(unreal.ComponentMobility.MOVABLE)
-    sky_comp.set_editor_property("intensity", 1.25)
+    sky_comp.set_editor_property("intensity", 2.5)  # Lumen-off fill
     try:
         sky_comp.set_editor_property("real_time_capture", True)
     except Exception as exc:

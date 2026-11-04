@@ -87,7 +87,7 @@ def test_path_corridor_clear_of_trunks():
     segs = [(a[0], a[1], b[0], b[1]) for path in pj["paths"]
             for a, b in zip(path, path[1:])]
     trees = json.loads((GEN / "placements.json").read_text())["trees"]
-    assert len(trees) == 4000
+    assert len(trees) >= 10000, len(trees)  # lush pass: 16k cap
     worst = min(min(_seg_dist(t["x_m"], t["y_m"], *s) for s in segs) for t in trees)
     assert worst > 3.4, worst  # generator carves 3.5 m
 
@@ -103,7 +103,32 @@ def test_paths_obj_topology():
 def test_variants_cover_all_trees():
     counts = json.loads((GEN / "variants.json").read_text())
     total = sum(counts[k] for k in ("emergent", "palm", "round", "bush", "charred"))
-    assert total == 4000, counts
+    n = json.loads((GEN / "placements.json").read_text())["count"]
+    assert total == n, counts  # every placed tree gets a variant
+
+
+def test_dirt_flat_tone():
+    # Path swatch: opaque peat-dirt brown (authored RGB, pre-swap bytes
+    # are BGR so on-disk R<B like every authored warm tone).
+    im = Image.open(GEN / "tex/dirt_flat.png").convert("RGBA")
+    px = list(im.getdata())
+    n = len(px)
+    assert all(p[3] == 255 for p in px)
+    r = sum(p[0] for p in px) / n
+    g = sum(p[1] for p in px) / n
+    b = sum(p[2] for p in px) / n
+    assert r < b and 40 < g < 110, (r, g, b)
+
+
+def test_paths_obj_up_normals():
+    # Ribbon needs explicit +Z normals: importer-computed ones from the
+    # down-wound strip lit unpredictably bright (live v3).
+    lines = (GEN / "paths.obj").read_text().splitlines()
+    nv = sum(1 for L in lines if L.startswith("v "))
+    nn = sum(1 for L in lines if L.startswith("vn "))
+    assert nn == nv > 0, (nv, nn)
+    assert all(L.split()[3] == "1.0000" for L in lines
+               if L.startswith("vn "))
 
 
 def test_grove_smooth_normals():

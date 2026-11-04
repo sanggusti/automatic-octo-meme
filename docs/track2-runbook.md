@@ -250,3 +250,30 @@ seeds, counts, frame time, spawn/bounds, deviations, bug bisects).
    (d) The PeatPad bisect plate landed coplanar with the shell (same
    height), so it cannot discriminate pad-vs-shell; the (100,100)
    probe 40 m off-pad blocking identically is the shell proof.
+9. Lumen hangs packaged loads on 10M-tri maps (bisected v3:
+   Nanite-off still hangs, Lumen-off loads, null-RHI loads).
+   Bake `[ConsoleVariables] r.DynamicGlobalIlluminationMethod=0
+   + r.ReflectionMethod=0` into DefaultEngine.ini (the
+   RendererSettings property spellings did NOT take). Verify
+   with a no-flags launch + census, never assume.
+10. Build all maps in ONE editor session (DMB_MAPS=both). Split
+    sessions rot the FIRST map\'s ribbon refs (white dashes,
+    pale 0.19) via delete-recreate staleness; single session
+    fixed it (pale 0.0002). verify_map reload-asserts guard the
+    classic empty-first-save, so keep them.
+11. Clean-cook after ANY merged-mesh size change. A 10x-shrunk
+    charred mesh + bigger fire rig sailed the incremental cook
+    and then hung every Burning load; clean cook fixed it
+    (182 actors). Incremental is fine for materials/lights only.
+12. Never reset() mid-transition: poll simListSceneObjects
+    until the target census (Before 41 / Burning 182), settle
+    30 s, THEN reset. Resetting into a transition bricks RPC
+    (game alive, server dead) and costs a relaunch.
+13. Census-assert every launch (staticmesh <40 = PeatBefore,
+    not the 301-actor fallback). The CLI map arg never resolves
+    Peat (short names miss /Game/Peat/, leading / parses as a
+    switch); GameDefaultMap=PeatBefore + simLoadLevel full path
+    is the working combo.
+14. -RenderOffScreen pegs the GPU at 99% idle (no present wait;
+    t.MaxFPS did not cap it). Kill the game between bursts;
+    never leave it rendering while afk.

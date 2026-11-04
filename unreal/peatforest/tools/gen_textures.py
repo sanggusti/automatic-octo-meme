@@ -173,6 +173,20 @@ def burn_patch():
     return img
 
 
+def dirt_flat(rng):
+    # Hidden-track swatch: flat peat-dirt brown + faint grain. Opaque.
+    # (Constant3Vector base colors render unpredictably bright live;
+    # colors go through texture swatches per the colosseum skill.)
+    img = Image.new("RGBA", (SIZE, SIZE), (122, 84, 52, 255))
+    px = img.load()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            j = rng.randint(-9, 9)
+            r, g, b, a = px[x, y]
+            px[x, y] = (r + j, g + j, b + j, a)
+    return img
+
+
 def clouds(rng):
     # Tileable cloud bank for the sky dome (wrapped blobs, soft alpha).
     # White is R/B-invariant; still saved via bgr() for uniformity.
@@ -233,7 +247,8 @@ def main():
             ("smoke", lambda rng: smoke(rng)),
             ("glow", lambda rng: glow()),
             ("burn_patch", lambda rng: burn_patch()),
-            ("clouds", lambda rng: clouds(rng)))
+            ("clouds", lambda rng: clouds(rng)),
+            ("dirt_flat", lambda rng: dirt_flat(rng)))
     for i, (name, fn) in enumerate(jobs):
         img = bgr(fn(random.Random(args.seed * 131 + i)))
         img.save(tex / f"{name}.png")

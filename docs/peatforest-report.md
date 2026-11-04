@@ -214,3 +214,58 @@ Bugs found + fixed in v1:
   headless modal (`FMessageDialog::Open` blocks the game thread).
 - AirSim `LogMessage` is screen-only (all `UE_LOG` commented
   out): RPC startup failures never reach the packaged log.
+
+## v3.1 + big fire (2026-11-04): shippable peatland
+
+Render hang root-caused (bisected live: Nanite-off still hangs,
+Lumen-off loads, null-RHI loads): Lumen GI/reflections hang
+packaged loads past ~10M tris. Baked `[ConsoleVariables]
+r.DynamicGlobalIlluminationMethod=0 + r.ReflectionMethod=0` into
+DefaultEngine.ini (RendererSettings property spellings do NOT
+take) + `GameDefaultMap=/Game/Peat/PeatBefore`: plain launches
+boot straight into Peat (41 actors, no flags).
+
+Fidelity fixes: mitered path ribbons (no dash gaps) with explicit
++Z normals + dirt swatch (constant-vector base colors render
+unpredictably bright -- mud/yellow, const/white); blob cap-UV
+pole fix (pale discs reduced); sky 1.25 -> 2.5 fill for Lumen-off;
+forest-floor tint under WorldCover stands; 16000 trees.
+
+Build laws (all burned in once): single-session DMB_MAPS=both
+(split sessions rot the first map\'s ribbon refs via
+delete-recreate staleness); clean-cook after ANY merged-mesh size
+change (incremental sailed a 10x-shrunk charred mesh, then hung
+every Burning load); census-assert every boot (301 staticmesh =
+old-map fallback); never reset() mid-transition (poll census,
+settle, then touch). Full list: runbook §8.9-14 + skill
+"Packaged-build laws".
+
+Visual override (promo, documented deviation): burn scar radius
+250 m -> 80 m (fires sit IN forest, not in clearings), fire rig
+3+2 -> 7 flames + 4 smoke per hotspot (70/40 total), lights
+3500 -> 6000/5000 m, scar 72 -> 120 m. Featured hotspot4
+(N729.6 E733.8, 158 trees <100 m) vs hotspot0 (9 trees <100 m).
+Tree placement still WorldCover, fire positions still FIRMS;
+scar size + rig scale are interpretive.
+
+Promo GIFs (5 s, 40 frames, 480px) in docs/img/peatforest/cine/:
+before_canopy / before_track / before_ops, burning_push /
+burning_orbit / burning_high (+ _still.png each). Recorder:
+runs/peat_cine.py (cine use of simSetCameraPose; restart the game
+before verification captures).
+
+Evals (forest_fire_peat, seeds 1-3, mock backend):
+
+| model | visual | edge | mission_score |
+|---|---|---|---|
+| baseten meta-models/muse-spark-open-1026 | yes | stub | 0.722 |
+| modal Qwen/Qwen2.5-7B-Instruct (fresh deploy) | text | stub | 0.586 |
+| baseten muse-spark | yes | SAM 3.1 (Meta API) | 0.075 (L1; SAM empties on mock renders, documented) |
+
+SAM 3.1 native-frame eval (runs/sam_peat.py + sam_score.py,
+640px, Meta API sam-3.1): fire frames hit fire 16+14 boxes,
+smoke 4 (level) / 0 (top-down); canopy "forest" 0 but "tree" 19
+(0.027 frac) -- vocabulary, not content; dirt track 0 under all
+of road/trail/dirt-road/path/footpath (flat synthetic ribbon
+invisible to SAM -- fidelity gap, honest miss). Score 3/6 on
+strict concepts, 4/6 counting tree~=forest.
