@@ -6,6 +6,8 @@ Reads data/peatforest/*.tif + firms_tileC.json, writes <out>/ with:
   albedo_2k.png (S2 visual window, 2048px)
   placements.json (canopy trees from WorldCover forest mask + clumping noise)
   canals.json (straight water strips along wettest rows)
+  paths.json + paths.obj (hidden-path network for the discovery eval;
+  tree placements exclude a 3.5 m corridor around every path)
   ops.json (flat ops area near spawn) + meta.json
 
 Grid mapping (same contract as forest_fire): grid (x=east, y=north) ->
@@ -120,10 +122,13 @@ def main() -> None:
         json.dumps({"step_m": step * 10, "n": len(heights),
                     "heights_cm": heights}))
 
-    # Albedo from S2 visual.
+    # Albedo from S2 visual. BGR pre-swapped: the UE import path
+    # renders R/B swapped (probed live; green-dominant pixels barely
+    # change, but brown clearings would render slate-blue).
     alb = windowed(data / "s2_20191023_T50MKB_visual.tif",
                    size=ALBEDO_N, resampling=Resampling.bilinear)
-    Image.fromarray(np.moveaxis(alb, 0, -1).astype("uint8")).save(out / "albedo_2k.png")
+    arr = np.moveaxis(alb, 0, -1).astype("uint8")[:, :, ::-1]
+    Image.fromarray(np.ascontiguousarray(arr)).save(out / "albedo_2k.png")
 
     # Tree placements: forest-mask pixels + clumping noise, seeded shuffle.
     wc = windowed(data / "worldcover_2021_S03E114.tif",
@@ -151,11 +156,87 @@ def main() -> None:
             ny = (1.0 - (y + rng.random()) / hn) * SPAN_M
             if ex > 15.0 or ny > 15.0:
                 cands.append((round(ex, 1), round(ny, 1)))
+    # Hidden-path network (eval: find the paths, score discovery).
+    # Seeded random walks reflected inside the tile margins.
+    paths = []
+    for p in range(3):
+        x, y = rng.uniform(200, 1800), rng.uniform(200, 1800)
+        head = rng.uniform(0, 2 * math.pi)
+        nodes = []
+        for _ in range(36):
+            head += rng.uniform(-0.5, 0.5)
+            x += math.cos(head) * 55.0
+            y += math.sin(head) * 55.0
+            if x < 60 or x > 1940:
+                head = math.pi - head
+                x = min(1940, max(60, x))
+            if y < 60 or y > 1940:
+                head = -head
+                y = min(1940, max(60, y))
+            nodes.append([round(x, 1), round(y, 1)])
+        paths.append(nodes)
+    (out / "paths.json").write_text(json.dumps(
+        {"seed": args.seed, "width_m": 2.5, "paths": paths}, indent=1))
+
+    def seg_dist(px, py, ax, ay, bx, by):
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 == 0 else max(0.0, min(1.0,
+            ((px - ax) * dx + (py - ay) * dy) / L2))
+        return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+    segs = [(a[0], a[1], b[0], b[1]) for path in paths
+            for a, b in zip(path, path[1:])]
+    # Carve paths out of the forest: no trunks within 3.5 m of a path.
+    cands = [c for c in cands
+             if min(seg_dist(c[0], c[1], *s) for s in segs) > 3.5]
     rng.shuffle(cands)
     trees = cands[:MAX_TREES]
     (out / "placements.json").write_text(json.dumps(
         {"seed": args.seed, "count": len(trees),
          "trees": [{"x_m": x, "y_m": y} for x, y in trees]}, indent=1))
+
+    # Path ribbons: dirt strips floating 15 cm over the DEM (same grid
+    # as the visual mesh, so no clipping). Z-up, y=-east, +Z winding.
+    def dem_at(ex, ny):
+        fx = min(GRID_N - 1.001, max(0.0, ex / step))
+        fy = min(GRID_N - 1.001, max(0.0, ny / step))
+        x0, y0 = int(fx), int(fy)
+        tx, ty = fx - x0, fy - y0
+        return (dem[y0, x0] * (1 - tx) * (1 - ty)
+                + dem[y0, x0 + 1] * tx * (1 - ty)
+                + dem[y0 + 1, x0] * (1 - tx) * ty
+                + dem[y0 + 1, x0 + 1] * tx * ty)
+
+    plines = ["# peatforest hidden paths (DMB eval)"]
+    pvt, arc = [], 0.0
+    for path in paths:
+        prev, pdir = None, (1.0, 0.0)
+        for i, (x, y) in enumerate(path):
+            if i + 1 < len(path):
+                dx, dy = path[i + 1][0] - x, path[i + 1][1] - y
+                L = math.hypot(dx, dy) or 1.0
+                pdir = (dx / L, dy / L)
+            px, py = -pdir[1], pdir[0]  # left normal
+            if prev is not None:
+                arc += math.hypot(x - prev[0], y - prev[1])
+            prev = (x, y)
+            for s, vv in ((-1.25, 0.0), (1.25, 1.0)):
+                ex, ny_ = x + px * s, y + py * s
+                h = dem_at(ex, ny_) * 100.0 + 15.0
+                plines.append(f"v {ny_ * 100.0:.1f} {-ex * 100.0:.1f} {h:.1f}")
+                pvt.append(f"vt {arc / 50.0:.4f} {vv:.1f}")
+    plines += pvt
+    # Two verts per node; faces per consecutive node pair per path.
+    vi = 1
+    for path in paths:
+        for _ in range(len(path) - 1):
+            a, b, c, d = vi, vi + 1, vi + 2, vi + 3
+            plines += [f"f {a}/{a} {b}/{b} {c}/{c}",
+                       f"f {b}/{b} {d}/{d} {c}/{c}"]
+            vi += 2
+        vi += 2
+    (out / "paths.obj").write_text("\n".join(plines) + "\n")
 
     # Canals: straight strips along the wettest rows (water+wetland).
     wet = np.isin(wc, [80, 90])
@@ -192,11 +273,12 @@ def main() -> None:
         "dem_min_m": round(float(dem.min()), 2),
         "dem_max_m": round(float(dem.max()), 2),
         "n_trees": len(trees), "n_canals": len(canals),
-        "n_hotspots": len(hotspots), "ops": ops,
+        "n_hotspots": len(hotspots), "n_paths": len(paths), "ops": ops,
     }
     (out / "meta.json").write_text(json.dumps(meta, indent=1))
     print(f"terrain {GRID_N}x{GRID_N} + {len(trees)} trees + "
-          f"{len(canals)} canals + {len(hotspots)} hotspots -> {out}")
+          f"{len(canals)} canals + {len(hotspots)} hotspots + "
+          f"{len(paths)} paths -> {out}")
 
 
 if __name__ == "__main__":

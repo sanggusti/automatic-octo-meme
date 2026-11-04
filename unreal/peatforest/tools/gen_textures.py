@@ -1,8 +1,14 @@
 """Seeded procedural alpha textures for the peat hi-fi pass (#65).
 
 Writes tex/*.png under --out: leaf_card, frond, flame, smoke, glow,
-burn_patch. Deterministic (RNG seed 7); PIL only. UE imports them as
-masked/translucent material inputs (see ue_build_peat.py).
+burn_patch, clouds. Deterministic (RNG seed 7); PIL only. UE imports
+them as masked/translucent material inputs (see ue_build_peat.py).
+
+BGR pre-swap: the UE import path renders texture R/B swapped
+(probed: PIL-correct orange flames rendered blue until the bytes
+were pre-swapped; see tests/test_terrain_gen.py). Every RGB output
+here is saved R/B-swapped so it renders as authored. Grayscale and
+white-alpha masks are unaffected but go through the same helper.
 """
 
 import argparse
@@ -19,26 +25,37 @@ def blank():
     return Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
 
 
+def bgr(img):
+    """Swap R/B channels (alpha untouched) for the UE import path."""
+    r, g, b, a = img.convert("RGBA").split()
+    return Image.merge("RGBA", (b, g, r, a))
+
+
 def leaf_card(rng):
-    img, dr = blank(), None
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    # Dense cluster fill: each canopy blob maps the whole card ONCE, so
+    # a sparse card (28% cover) masked whole crowns away (trees rendered
+    # as sticks). Opaque dark base + layered leaflets + a few punched
+    # depth holes (~8%): reads as a closed crown with interior shadow.
+    img = Image.new("RGBA", (SIZE, SIZE), (14, 42, 18, 255))
     dr = ImageDraw.Draw(img)
-    for _ in range(140):
-        cx, cy = rng.uniform(40, SIZE - 40), rng.uniform(40, SIZE - 40)
-        a, b = rng.uniform(14, 30), rng.uniform(6, 12)
-        ang = rng.uniform(0, 180)
-        g = rng.uniform(0.32, 0.62)
-        col = (int(38 * g / 0.5), int(120 * g / 0.5), int(52 * g / 0.5), 255)
+    for _ in range(460):
+        cx, cy = rng.uniform(0, SIZE), rng.uniform(0, SIZE)
+        a, b = rng.uniform(10, 26), rng.uniform(5, 11)
+        g = rng.uniform(0.3, 0.75)
+        col = (int(40 * g / 0.5), int(128 * g / 0.5), int(54 * g / 0.5), 255)
         dr.ellipse([cx - a, cy - b, cx + a, cy + b], fill=col, outline=None)
-        # PIL ellipse can't rotate; fake rotation by drawing then rotating
-        # the whole layer per leaflet is too slow — jitter shape instead.
-        _ = ang
-    # Veins: darker short strokes on a subset.
-    for _ in range(60):
-        x, y = rng.uniform(60, SIZE - 60), rng.uniform(60, SIZE - 60)
-        dr.line([x - 8, y, x + 8, y], fill=(20, 60, 26, 255), width=2)
-    img = img.filter(ImageFilter.GaussianBlur(0.6))
-    return img
+    for _ in range(90):
+        x, y = rng.uniform(0, SIZE), rng.uniform(0, SIZE)
+        dr.line([x - 7, y, x + 7, y], fill=(18, 58, 24, 255), width=2)
+    # Punch depth holes (wrapped, so blob UV seams stay clean).
+    for _ in range(70):
+        cx, cy = rng.uniform(0, SIZE), rng.uniform(0, SIZE)
+        r = rng.uniform(6, 16)
+        for ox in (-SIZE, 0, SIZE):
+            for oy in (-SIZE, 0, SIZE):
+                dr.ellipse([cx - r + ox, cy - r + oy, cx + r + ox, cy + r + oy],
+                           fill=(0, 0, 0, 0), outline=None)
+    return img.filter(ImageFilter.GaussianBlur(0.6))
 
 
 def frond(rng):
@@ -129,22 +146,73 @@ def burn_patch():
     return img
 
 
+def clouds(rng):
+    # Tileable cloud bank for the sky dome (wrapped blobs, soft alpha).
+    # White is R/B-invariant; still saved via bgr() for uniformity.
+    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    layer = Image.new("L", (SIZE, SIZE), 0)
+    dl = ImageDraw.Draw(layer)
+    for _ in range(46):
+        cx, cy = rng.uniform(0, SIZE), rng.uniform(0, SIZE)
+        a, b = rng.uniform(34, 96), rng.uniform(15, 38)
+        v = rng.randint(110, 230)
+        for ox in (-SIZE, 0, SIZE):
+            for oy in (-SIZE, 0, SIZE):
+                dl.ellipse([cx - a + ox, cy - b + oy, cx + a + ox, cy + b + oy],
+                           fill=v)
+    layer = layer.filter(ImageFilter.GaussianBlur(6))
+    # Broken cover (~45%): remap soft mids to transparent.
+    layer = layer.point(lambda v: 0 if v < 70 else int((v - 70) * 1.35))
+    shade = Image.new("RGB", (SIZE, SIZE), (244, 240, 232))
+    img.paste(shade, (0, 0), layer)
+    return img
+
+
+PBR_FILES = ("bark_diff.jpg", "bark_nor.png", "mud_diff.jpg", "mud_nor.png",
+             "burn_diff.jpg")
+
+
+def swap_pbr(src_dir, out_dir):
+    """BGR pre-swap vendored PBR bytes into derived ue_gen/pbr/.
+
+    assets_raw/ stays pristine (hash-pinned in manifest.yaml); the
+    swapped copies are derived artifacts the builder imports.
+    """
+    src, dst = Path(src_dir), Path(out_dir) / "pbr"
+    dst.mkdir(parents=True, exist_ok=True)
+    for name in PBR_FILES:
+        img = Image.open(src / name)
+        mode = img.mode
+        out = bgr(img).convert(mode)
+        kw = {"quality": 95} if name.endswith(".jpg") else {}
+        out.save(dst / name, **kw)
+        print("swapped", name)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--pbr-src", default=None,
+                    help="assets_raw dir; when given, write BGR-swapped "
+                         "copies to <out>/pbr/")
     args = ap.parse_args()
-    rng = random.Random(args.seed)
     tex = Path(args.out) / "tex"
     tex.mkdir(parents=True, exist_ok=True)
-    for name, fn in (("leaf_card", lambda: leaf_card(rng)),
-                     ("frond", lambda: frond(rng)),
-                     ("flame", lambda: flame(rng)),
-                     ("smoke", lambda: smoke(rng)),
-                     ("glow", glow),
-                     ("burn_patch", burn_patch)):
-        fn().save(tex / f"{name}.png")
+    # Per-texture sub-seeds: adding a texture never reshuffles the rest.
+    jobs = (("leaf_card", lambda rng: leaf_card(rng)),
+            ("frond", lambda rng: frond(rng)),
+            ("flame", lambda rng: flame(rng)),
+            ("smoke", lambda rng: smoke(rng)),
+            ("glow", lambda rng: glow()),
+            ("burn_patch", lambda rng: burn_patch()),
+            ("clouds", lambda rng: clouds(rng)))
+    for i, (name, fn) in enumerate(jobs):
+        img = bgr(fn(random.Random(args.seed * 131 + i)))
+        img.save(tex / f"{name}.png")
         print("wrote", name)
+    if args.pbr_src:
+        swap_pbr(args.pbr_src, args.out)
 
 
 if __name__ == "__main__":

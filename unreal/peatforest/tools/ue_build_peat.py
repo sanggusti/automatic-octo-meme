@@ -43,7 +43,9 @@ def load_inputs():
             out[name] = json.load(fh)
     out["dir"] = root
     out["swatches"] = os.path.join(unreal.Paths.project_dir(), "inputs", "swatches")
-    out["assets_raw"] = os.path.join(root, "assets_raw")
+    # BGR-swapped derived PBR (gen_textures --pbr-src); assets_raw stays
+    # pristine/hash-pinned and is never imported directly.
+    out["pbr"] = os.path.join(root, "pbr")
     return out
 
 
@@ -208,11 +210,12 @@ def make_materials(data):
     tx = os.path.join(data["dir"], "tex")
     proctex = {n: import_texture(os.path.join(tx, f"{n}.png"), f"T_Peat_{n}")
                for n in ("leaf_card", "frond", "flame", "smoke", "glow",
-                         "burn_patch")}
-    raw = data["assets_raw"]
-    bark = import_texture(os.path.join(raw, "bark_diff.jpg"), "T_Peat_Bark")
+                         "burn_patch", "clouds")}
+    raw = data["pbr"]
+    bark = import_texture(os.path.join(raw, "bark_diff.jpg"), "T_Peat_Bark",
+                          wrap=True)
     bark_n = import_texture(os.path.join(raw, "bark_nor.png"), "T_Peat_BarkN",
-                            normal=True)
+                            normal=True, wrap=True)
     mud = import_texture(os.path.join(raw, "mud_diff.jpg"), "T_Peat_Mud",
                          wrap=True)
     mud_n = import_texture(os.path.join(raw, "mud_nor.png"), "T_Peat_MudN",
@@ -252,10 +255,11 @@ def make_materials(data):
     _finish_mat("M_Peat_Charred")
     mats["charred"] = mat
 
-    # Canopy: leaf cards, masked alpha + slight emissive lift.
+    # Canopy: dense cluster fill, masked + slight emissive lift.
+    # Clip 0.2 keeps the punched depth holes while holding the crown.
     mat = _new_mat("M_Peat_Canopy")
     mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
-    mat.set_editor_property("opacity_mask_clip_value", 0.33)
+    mat.set_editor_property("opacity_mask_clip_value", 0.2)
     node = sample(mat, proctex["leaf_card"])
     out(mat, node, "RGB", MP.MP_BASE_COLOR, "canopy")
     out(mat, node, "A", MP.MP_OPACITY_MASK, "canopy-mask")
@@ -319,6 +323,30 @@ def make_materials(data):
     out(mat, anode, "A", MP.MP_OPACITY, "burn-alpha")
     _finish_mat("M_Peat_Burn")
     mats["burn"] = mat
+
+    # Path: dirt track (mud squared = darker; two-sided because
+    # ribbon winding follows path direction).
+    mat = _new_mat("M_Peat_Path")
+    m = mul(mat)
+    pnode = sample(mat, mud)
+    assert lib.connect_material_expressions(pnode, "RGB", m, "A")
+    assert lib.connect_material_expressions(pnode, "RGB", m, "B")
+    out(mat, m, "", MP.MP_BASE_COLOR, "path")
+    mat.set_editor_property("two_sided", True)
+    _finish_mat("M_Peat_Path")
+    mats["path"] = mat
+
+    # Clouds: unlit drifting bank on the sky dome.
+    mat = _new_mat("M_Peat_Clouds")
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    cnode = wire_uv(mat, proctex["clouds"], scroll=(0.004, 0.001))
+    out(mat, sample(mat, meadow["black"]), "RGB", MP.MP_BASE_COLOR,
+        "cloud-base")
+    out(mat, cnode, "A", MP.MP_OPACITY, "cloud-alpha")
+    out(mat, lift(mat, cnode, 1.2), "", MP.MP_EMISSIVE_COLOR, "cloud-lit")
+    mat.set_editor_property("two_sided", True)
+    _finish_mat("M_Peat_Clouds")
+    mats["clouds"] = mat
 
     # Water: unchanged flat stand-in.
     mat = _new_mat("M_Peat_Water")
@@ -393,16 +421,22 @@ def build_map(name, data, mats, meshes, burning):
             ny = (f["lat"] - -2.86) * 110540.0
             gz = sample_height(data["heights"], ex, ny)
             ux, uy = ny * 100.0, ex * 100.0
-            spawn_mesh((ux, uy, gz + 380.0), meshes["cone"], mats["flame"],
-                       (4.4, 4.4, 3.2), collide=False)
-            stats["flames"] += 1
-            spawn_mesh((ux, uy, gz + 420.0), meshes["cube"], mats["smoke"],
-                       (2.5, 2.5, 7.0), collide=False)
-            stats["smoke"] += 1
+            # Big fire: nested tongue cones + tall smoke columns.
+            for fz, fs in ((380.0, (5.5, 5.5, 4.2)),
+                           (460.0, (3.6, 3.6, 5.2)),
+                           (520.0, (2.2, 2.2, 6.0))):
+                spawn_mesh((ux, uy, gz + fz), meshes["cone"], mats["flame"],
+                           fs, collide=False)
+                stats["flames"] += 1
+            for sz, ss in ((420.0, (3.0, 3.0, 9.0)),
+                           (700.0, (4.5, 4.5, 12.0))):
+                spawn_mesh((ux, uy, gz + sz), meshes["cube"], mats["smoke"],
+                           ss, collide=False)
+                stats["smoke"] += 1
             spawn_mesh((ux, uy, gz + 18.0), meshes["plane"], mats["burn"],
-                       (7.5, 7.5, 1.0), collide=False)
+                       (9.0, 9.0, 1.0), collide=False)
             spawn_mesh((ux, uy, gz + 30.0), meshes["plane"], mats["glow"],
-                       (4.0, 4.0, 1.0), collide=False)
+                       (5.0, 5.0, 1.0), collide=False)
             # Fire light: orange point glow, no shadows (10 shadow-casting
             # point lights would tank the frame budget).
             lamp = unreal.EditorLevelLibrary.spawn_actor_from_class(
@@ -411,8 +445,8 @@ def build_map(name, data, mats, meshes, burning):
             lamp.set_actor_label("FireLight")
             plc = lamp.get_component_by_class(unreal.PointLightComponent)
             plc.set_mobility(unreal.ComponentMobility.MOVABLE)
-            plc.set_editor_property("intensity", 3000.0)
-            plc.set_editor_property("attenuation_radius", 2500.0)
+            plc.set_editor_property("intensity", 6000.0)
+            plc.set_editor_property("attenuation_radius", 3500.0)
             plc.set_editor_property("light_color",
                                     unreal.Color(255, 120, 30, 255))
             plc.set_editor_property("cast_shadows", False)
@@ -432,6 +466,21 @@ def build_map(name, data, mats, meshes, burning):
         sx, sy = (across, along) if yaw == 0.0 else (along, across)
         spawn_mesh((cy * 100.0, cx * 100.0, gz), meshes["plane"],
                    mats["water"], (sx, sy, 1.0), collide=False, yaw=yaw)
+        stats["meshes"] += 1
+    # Hidden-path ribbons (both variants; the eval scores discovery).
+    pa = spawn_mesh((0.0, 0.0, 0.0), meshes["paths"], mats["path"],
+                    (1, 1, 1), collide=False)
+    pa.set_actor_label("PeatPaths")
+    stats["meshes"] += 1
+    stats["paths"] = 3
+    # Cloud domes: two squashed spheres over the tile center, slow drift.
+    for label, pos, scl in (("CloudFar", (100000.0, 100000.0, -400.0),
+                             (9000.0, 9000.0, 2600.0)),
+                            ("CloudNear", (100000.0, 100000.0, -300.0),
+                             (5500.0, 5500.0, 1800.0))):
+        ca = spawn_mesh(pos, meshes["sphere"], mats["clouds"], scl,
+                        collide=False)
+        ca.set_actor_label(label)
         stats["meshes"] += 1
     log(f"instances: {stats}")
 
@@ -540,9 +589,12 @@ def main():
                               "/Game/Peat", "SM_GroveCanopy"),
         "charred": import_mesh(os.path.join(data["dir"], "charred.obj"),
                                "/Game/Peat", "SM_GroveCharred"),
+        "paths": import_mesh(os.path.join(data["dir"], "paths.obj"),
+                               "/Game/Peat", "SM_PeatPaths"),
         "cone": unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Cone"),
         "cube": unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Cube"),
         "plane": unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Plane"),
+        "sphere": unreal.EditorAssetLibrary.load_asset("/Engine/BasicShapes/Sphere"),
     }
     missing = [k for k, v in meshes.items() if v is None]
     if missing:

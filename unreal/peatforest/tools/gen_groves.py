@@ -166,7 +166,8 @@ def main():
         tint = tuple(min(1.0, v) for v in (1.0 + tj, 1.0 + tj, 1.0 + tj * 0.5))
         if burnt:
             counts["charred"] += 1
-            top = tube(charred, ux, uz, gz, 32 * sc, 20 * sc, 620 * sc, tint)
+            top = tube(charred, ux, uz, gz, 32 * sc, 20 * sc, 620 * sc, tint,
+                       vscale=620 * sc / 250.0)
             for _ in range(rng.randint(2, 3)):
                 ba = rng.uniform(0, 2 * math.pi)
                 bx = top[0] + rng.uniform(-40, 40) * sc
@@ -188,8 +189,9 @@ def main():
         roll = rng.random()
         if roll < 0.40:  # emergent broadleaf: tall trunk + 3 tiers
             counts["emergent"] += 1
-            top = tube(trunk, ux, uz, gz, 38 * sc, 24 * sc, 760 * sc, tint)
-            for k, (r, dz) in enumerate(((450, 620), (350, 800), (240, 960))):
+            top = tube(trunk, ux, uz, gz, 44 * sc, 26 * sc, 820 * sc, tint,
+                       vscale=820 * sc / 250.0)
+            for k, (r, dz) in enumerate(((600, 620), (470, 810), (320, 970))):
                 blob(canopy, top[0] + rng.uniform(-30, 30),
                      top[1] + rng.uniform(-30, 30), gz + dz * sc,
                      r * sc, r * 0.9 * sc, r * 0.42 * sc, tint,
@@ -198,10 +200,10 @@ def main():
             counts["palm"] += 1
             lean = (rng.uniform(-90, 90), rng.uniform(-90, 90))
             top = tube(trunk, ux, uz, gz, 26 * sc, 20 * sc, 800 * sc, tint,
-                       lean=lean)
+                       lean=lean, vscale=800 * sc / 250.0)
             for k in range(9):
                 fa = yaw + k * 2 * math.pi / 9 + rng.uniform(-0.1, 0.1)
-                frond(fronds, top[0], top[1], top[2], 360 * sc, 95 * sc, fa,
+                frond(fronds, top[0], top[1], top[2], 430 * sc, 110 * sc, fa,
                       0.0, tint)
             for _ in range(3):
                 na = rng.uniform(0, 2 * math.pi)
@@ -211,8 +213,9 @@ def main():
                      detail=(6, 4))
         elif roll < 0.85:  # round canopy: trunk + 2 blobs
             counts["round"] += 1
-            top = tube(trunk, ux, uz, gz, 30 * sc, 20 * sc, 420 * sc, tint)
-            for dz, r in ((520, 300), (680, 210)):
+            top = tube(trunk, ux, uz, gz, 34 * sc, 22 * sc, 460 * sc, tint,
+                       vscale=460 * sc / 250.0)
+            for dz, r in ((560, 400), (730, 280)):
                 blob(canopy, top[0] + rng.uniform(-25, 25),
                      top[1] + rng.uniform(-25, 25), gz + dz * sc,
                      r * sc, r * sc, r * 0.55 * sc, tint,
@@ -220,7 +223,7 @@ def main():
         else:  # understory bush: dark squashed blob
             counts["bush"] += 1
             dark = (tint[0] * 0.72, tint[1] * 0.75, tint[2] * 0.72)
-            blob(canopy, ux, uz, gz + 130 * sc, 190 * sc, 170 * sc, 120 * sc,
+            blob(canopy, ux, uz, gz + 140 * sc, 260 * sc, 230 * sc, 150 * sc,
                  dark, seed_ang=rng.uniform(0, 3))
 
     out = Path(args.out)
