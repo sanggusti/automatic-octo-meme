@@ -18,7 +18,7 @@ from dmb.perception.grounding import (
     project_mask,
     survey_camera,
 )
-from dmb.perception.sam import HAZARD_CONCEPTS, SegMap
+from dmb.perception.sam import HAZARD_CONCEPTS, SegMap, rasterize_concept
 
 COST_ROAD = 0.5
 COST_OPEN = 1.0
@@ -144,12 +144,18 @@ def render_route_map(
     cell_m: float,
     assumed_geometry: bool = True,
     stride: int = 2,
+    cam=None,
+    pose=None,
 ) -> str:
-    """Shared tool/solver composition: seg-map + state -> rescuer text."""
+    """Shared tool/solver composition: seg-map + state -> rescuer text.
+
+    `cam`/`pose` override the assumed survey stance (survey frames pass
+    their calibrated camera + pose with assumed_geometry=False).
+    """
     if seg.frame_size is None:
         return "Route map unavailable: empty seg-map."
-    cam = survey_camera(*seg.frame_size)
-    pose = pose_from_state(state)
+    cam = cam or survey_camera(*seg.frame_size)
+    pose = pose or pose_from_state(state)
     spec = grid_from_state(state, cell_m)
 
     def project_concept(concept: str):
@@ -172,6 +178,83 @@ def render_route_map(
     ]
     return format_route_map(
         seg, plan_routes(grid, start, goals), start, cell_m, assumed_geometry)
+
+
+SEG_OVERLAY_COLORS = {
+    "fire": (255, 60, 20),
+    # Deep blue + strong alpha: smoke masks sit on white columns, so a
+    # pale tint would wash out.
+    "smoke": (70, 150, 255),
+    "road": (255, 220, 0),
+    "water": (40, 120, 255),
+    "person": (60, 255, 60),
+    "animal": (200, 80, 255),
+    "building": (80, 220, 220),
+    "vehicle": (255, 80, 200),
+    "car": (255, 80, 200),
+    "tent": (255, 160, 40),
+}
+
+
+def render_seg_overlay(png: bytes, seg: SegMap, grid: int = 160) -> bytes:
+    """Final-segmentation footage: frame + translucent concept masks."""
+    import io  # noqa: PLC0415
+
+    from PIL import Image, ImageDraw  # noqa: PLC0415
+
+    img = Image.open(io.BytesIO(png)).convert("RGB")
+    w, h = img.size
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    if seg.frame_size:
+        # Square cells over max(w,h), mirroring rasterize_concept.
+        cell_px = max(w, h) / grid
+        for concept, result in seg.results.items():
+            pairs = [
+                (r, ras)
+                for r, ras in zip(result.records, result.rasters)
+                if ras is not None
+            ]
+            if not pairs:
+                continue
+            color = SEG_OVERLAY_COLORS.get(concept, (255, 255, 255))
+            for gx, gy in rasterize_concept(pairs, seg.frame_size, grid):
+                x0, y0 = gx * cell_px, gy * cell_px
+                x1, y1 = x0 + cell_px, y0 + cell_px
+                draw.rectangle([x0, y0, x1, y1], fill=color + (160,))
+    base = Image.alpha_composite(img.convert("RGBA"), layer).convert("RGB")
+    counts = ",".join(f"{c}:{len(r.records)}" for c, r in seg.results.items())
+    legend = (
+        f"severity={seg.severity.label}({seg.severity.index:.2f}) "
+        f"counts={{{counts}}}"
+    )
+    strip = Image.new("RGB", (w, 22), (10, 10, 10))
+    ImageDraw.Draw(strip).text((6, 4), legend, fill=(240, 240, 240))
+    out = Image.new("RGB", (w, h + 22), (0, 0, 0))
+    out.paste(base, (0, 0))
+    out.paste(strip, (0, h))
+    buf = io.BytesIO()
+    out.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def save_seg_artifacts(sample_id: str, frame_png: bytes, seg: SegMap):
+    """Persist final frame + segmentation overlay; None without a run id."""
+    import os  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    run_id = os.environ.get("DMB_RUN_ID", "").strip()
+    if not run_id:
+        return None
+    runs_dir = os.environ.get("DMB_RUNS_DIR", "").strip() or "runs"
+    outdir = Path(runs_dir) / run_id / "sim"
+    outdir.mkdir(parents=True, exist_ok=True)
+    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in sample_id)
+    (outdir / f"{safe}_frame.png").write_bytes(frame_png)
+    (outdir / f"{safe}_segmap.png").write_bytes(
+        render_seg_overlay(frame_png, seg)
+    )
+    return outdir
 
 
 def format_route_map(

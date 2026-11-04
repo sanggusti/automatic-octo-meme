@@ -89,3 +89,34 @@ def test_survey_camera_is_nadir():
     cam = survey_camera(640, 480)
     assert (cam.pitch_deg, cam.yaw_deg) == (90.0, 0.0)
     assert (cam.width, cam.height) == (640, 480)
+
+
+def test_grid_to_pixel_yaw_roundtrip():
+    from dmb.perception.grounding import (
+        CameraModel, DronePose, GridSpec, grid_to_pixel, project_pixel,
+    )
+
+    grid = GridSpec(120, 120, 5.0)
+    pose = DronePose(59, 63, 150.0)
+    for yaw in (0.0, 90.0, 180.0, 270.0):
+        cam = CameraModel(1280, 720, 60.0, 90.0, yaw)
+        for cell in ((58, 60), (50, 54), (59, 63)):
+            px = grid_to_pixel(cell, cam, pose, grid)
+            if px is None:
+                continue
+            assert project_pixel(px[0], px[1], cam, pose, grid) == cell
+
+
+def test_grid_to_pixel_firms_nadir_hits_beds():
+    """Yaw-90 survey model lands on the rendered firebeds (<30 px)."""
+    from dmb.perception.grounding import (
+        CameraModel, DronePose, GridSpec, grid_to_pixel,
+    )
+
+    cam = CameraModel(1280, 720, 60.0, 90.0, 90.0)
+    pose = DronePose(59, 63, 150.0)
+    grid = GridSpec(120, 120, 5.0)
+    # Measured orange centroids in survey-...-nadir.png (2026-11-04).
+    for cell, want in (((58, 60), (748, 386)), ((50, 54), (978, 678))):
+        u, v = grid_to_pixel(cell, cam, pose, grid)
+        assert abs(u - want[0]) < 30 and abs(v - want[1]) < 30

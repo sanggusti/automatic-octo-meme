@@ -135,20 +135,26 @@ def project_pixel(
 def grid_to_pixel(
     cell: tuple[int, int], cam: CameraModel, pose: DronePose, grid: GridSpec
 ) -> tuple[float, float] | None:
-    """Inverse map for nadir/north cameras: grid cell center -> pixel.
+    """Inverse map for nadir cameras: grid cell center -> pixel.
 
-    Only exact for pitch=90/yaw=0 survey stance (anything else raises);
-    used by the perception oracle to place perfect boxes. Returns None
-    when the cell falls outside the frame.
+    Exact for pitch=90 at any yaw (non-nadir raises); used by the
+    perception oracle to place perfect boxes and by the SAM proposer
+    to seed point prompts. Returns None when the cell falls outside
+    the frame.
     """
-    if cam.pitch_deg != 90.0 or cam.yaw_deg % 360.0 != 0.0:
-        raise ValueError("grid_to_pixel needs the nadir/north survey stance")
+    if cam.pitch_deg != 90.0:
+        raise ValueError("grid_to_pixel needs the nadir survey stance")
     if pose.altitude_m <= 0 or grid.cell_m <= 0:
         return None
+    yaw = math.radians(cam.yaw_deg % 360.0)
+    sy, cy = math.sin(yaw), math.cos(yaw)
     east = (cell[0] + 0.5) * grid.cell_m
     north = (cell[1] + 0.5) * grid.cell_m
-    u = cam.cx + cam.fx * (east - pose.x * grid.cell_m) / pose.altitude_m
-    v = cam.cy + cam.fy * (pose.y * grid.cell_m - north) / pose.altitude_m
+    dx = (east - pose.x * grid.cell_m) / pose.altitude_m
+    dy = (north - pose.y * grid.cell_m) / pose.altitude_m
+    # Inverse of the nadir ray: rx = cy*dx - sy*dy, ry = -sy*dx - cy*dy.
+    u = cam.cx + cam.fx * (cy * dx - sy * dy)
+    v = cam.cy + cam.fy * (-sy * dx - cy * dy)
     if not (0 <= u < cam.width and 0 <= v < cam.height):
         return None
     return (u, v)

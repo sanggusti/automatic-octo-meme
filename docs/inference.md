@@ -29,23 +29,29 @@ Verified against the installed inspect-ai provider: model id
 
 ## Modal (custom models)
 
-- Serve with vLLM in OpenAI-compatible mode: `infra/modal/vllm_server.py`
-  (CUDA image, Hugging Face + vLLM caches on Modal Volumes).
+- Serve with vLLM in OpenAI-compatible mode (CUDA image, Hugging Face
+  + vLLM caches on Modal Volumes). One server file per model:
+  `infra/modal/vllm_server.py` (Qwen2.5-7B, hermes parser),
+  `infra/modal/vllm_mistral.py` (Mistral-7B-v0.3, mistral parser),
+  `infra/modal/vllm_qwen14b.py` (Qwen2.5-14B-AWQ, hermes + `--quantization awq`).
 - After `modal deploy`, set `MODAL_BASE_URL=<serve-url>/v1` and
   `MODAL_API_KEY`.
 - Model id: `openai-api/modal/<model-name>` (helper:
   `dmb.models.modal_model_id`).
-- The scaffold's server file is **untested**; the inference-spike issue
-  owns first deploy + verification.
-- Status: **verified 2026-10-27** (smoke 1.0, forest_fire limit-1 0.627).
-  Deployment stopped after verification; redeploy any time with
-  `modal deploy infra/modal/vllm_server.py`, record the serve URL as
-  `MODAL_BASE_URL=<url>/v1` in `.env`, and keep `docs/specs.md` current.
+- Live endpoints (2026-11-04, serverless, scale to zero):
+  `https://sanggusti--dmb-vllm-openai-compatible-serve.us-east.modal.run`
+  (Qwen2.5-7B),
+  `https://sanggusti--dmb-vllm-mistral-serve.us-east.modal.run` (Mistral-7B),
+  `https://sanggusti--dmb-vllm-qwen14b-serve.us-east.modal.run` (Qwen14B-AWQ).
+- Status: **verified 2026-10-27** (smoke 1.0, forest_fire limit-1 0.627);
+  Mistral + 14B tool-gated 2026-11-04 (forced tool_choice yields valid calls).
 - Gotchas observed: vLLM must be pinned (0.21.0 on CUDA 12.9; 0.32 on
   CUDA 12.4 crashes in FlashInfer JIT); tool calling needs
-  `--enable-auto-tool-choice --tool-call-parser hermes`; the sandbox
+  `--enable-auto-tool-choice` + the matching `--tool-call-parser`; the sandbox
   blocks Modal's connection (DNS), so Modal commands need an unsandboxed
-  shell.
+  shell; Llama repos are HF-gated (401) so the matrix uses ungated
+  Mistral/Qwen only; Mistral-7B-v0.3 needs temperature=0 for reliable
+  tool calls (temp 1.0 wanders to max-length empties).
 
 ## Verification ladder
 

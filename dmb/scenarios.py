@@ -120,13 +120,17 @@ def build_samples(
     mission_brief: str | None = None,
     weather: str | None = None,
     time_of_day: str | None = None,
+    fleet_size: int = 1,
 ) -> list[Sample]:
     """Expand (scenario, seeds) into inspect-ai samples with fixed metadata.
 
     ``weather`` selects one of the scenario's weather options as the active
     dynamics weather (``weather_active``); None keeps raw dynamics config.
     ``time_of_day`` likewise selects visibility (``time_of_day_active``).
+    ``fleet_size`` > 1 launches that many drones from spread pads.
     """
+    if fleet_size < 1:
+        raise ValueError(f"fleet_size must be >= 1 (got {fleet_size})")
     config = load_scenario(scenario, scenarios_dir)
     firms_meta = None
     firms = config.raw.get("firms")
@@ -169,7 +173,7 @@ def build_samples(
         )
         suffix = (f"-{weather}" if weather else "") + (
             f"-{time_of_day}" if time_of_day else ""
-        )
+        ) + (f"-fleet{fleet_size}" if fleet_size > 1 else "")
         samples.append(
             Sample(
                 input=brief,
@@ -177,6 +181,7 @@ def build_samples(
                 metadata={
                     "scenario": scenario,
                     "seed": seed,
+                    "fleet_size": fleet_size,
                     "drone_spec": "quad_iris_class",
                     "weather_active": weather,
                     "time_of_day_active": time_of_day,

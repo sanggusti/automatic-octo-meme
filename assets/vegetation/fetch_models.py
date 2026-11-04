@@ -16,7 +16,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-MANIFEST_SECTIONS = ("vegetation", "emitters")
+MANIFEST_SECTIONS = ("vegetation", "emitters", "actors")
 
 
 def manifest_entries(manifest_path: Path) -> dict[str, dict]:
@@ -66,8 +66,12 @@ def create_aliases(models_dir: Path) -> list[str]:
     Fuel model SDFs self-reference ``model://<config-name>`` (e.g.
     grass-plane's SDF wants ``model://grass_plane/...``), so the
     resolution root must carry those spellings too. Both the raw
-    <name> and its spaces-to-underscores variant are linked.
+    <name> and its spaces-to-underscores variant are linked, plus
+    every model:// spellings the SDFs actually reference (some
+    models self-ref under a different legacy name, e.g.
+    standing-person's SDF wants model://person_standing/...).
     """
+    import re  # noqa: PLC0415
     import xml.etree.ElementTree as ET  # noqa: PLC0415
 
     aliases = []
@@ -78,7 +82,11 @@ def create_aliases(models_dir: Path) -> list[str]:
         if not config.exists():
             continue
         name = ET.fromstring(config.read_text()).findtext("name") or ""
-        for spelling in {name, name.replace(" ", "_")} - {"", target.name}:
+        spellings = {name, name.replace(" ", "_")}
+        for sdf in target.glob("*.sdf"):
+            for ref in re.findall(r"model://([^/<\"]+)", sdf.read_text()):
+                spellings.add(ref.strip())
+        for spelling in spellings - {"", target.name}:
             link = models_dir / spelling
             if link.is_symlink() or link.exists():
                 link.unlink() if link.is_symlink() else None

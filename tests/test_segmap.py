@@ -116,3 +116,73 @@ def test_grounding_to_costs_to_route_integration():
     route = plan_route(grid, (0, 0), (9, 9))
     assert route.reachable
     assert not (set(route.waypoints) & blocked)
+
+
+def _overlay_seg():
+    from dmb.perception.sam import SegConceptResult
+
+    rec = SAMRecord(
+        object_id=0,
+        box=SAMBox(10, 10, 20, 20, 100, 100, 0.9),
+        mask=SAMMask(2, 2, "lossless", "~fake"),
+    )
+    seg = SegMap()
+    seg.results["fire"] = SegConceptResult("fire", [rec], [bytes([1, 1, 1, 1])])
+    seg.frame_size = (100, 100)
+    seg.severity = SeverityScore(0.03, "minor")
+    return seg
+
+
+def test_render_seg_overlay_png_with_legend():
+    import io
+
+    from PIL import Image
+
+    from dmb.perception.segmap import render_seg_overlay
+
+    buf = io.BytesIO()
+    Image.new("RGB", (100, 100), (10, 10, 10)).save(buf, format="PNG")
+    out = render_seg_overlay(buf.getvalue(), _overlay_seg(), grid=20)
+    img = Image.open(io.BytesIO(out))
+    assert img.size == (100, 122)  # frame + legend strip
+    assert out[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_render_seg_overlay_registers_nonsquare():
+    """Mask tint must land on the record box (no axis squash)."""
+    import io
+
+    from PIL import Image
+
+    from dmb.perception.sam import SegConceptResult
+    from dmb.perception.segmap import render_seg_overlay
+
+    rec = SAMRecord(
+        object_id=0,
+        box=SAMBox(60, 30, 79, 49, 100, 60, 0.9),
+        mask=SAMMask(2, 2, "lossless", "~fake"),
+    )
+    seg = SegMap()
+    seg.results["fire"] = SegConceptResult("fire", [rec], [bytes([1, 1, 1, 1])])
+    seg.frame_size = (100, 60)
+    buf = io.BytesIO()
+    Image.new("RGB", (100, 60), (10, 10, 10)).save(buf, format="PNG")
+    img = Image.open(io.BytesIO(render_seg_overlay(buf.getvalue(), seg, grid=20)))
+    r, g, b = img.getpixel((70, 40))  # inside the box: fire tint
+    assert r > 100 and r > g + 30
+    r0, g0, b0 = img.getpixel((10, 10))  # far outside: untouched
+    assert (r0, g0, b0) == (10, 10, 10)
+
+
+def test_render_route_map_calibrated_override():
+    from dmb.perception.segmap import render_route_map
+
+    seg = _overlay_seg()
+    state = {"drone": {"x": 0, "y": 0}, "grid": {"width": 10, "height": 10},
+             "victims": []}
+    cam = CameraModel(100, 100, 60.0, 90.0, 0.0)
+    pose = DronePose(0, 0, 50.0)
+    text = render_route_map(seg, state, 5.0, False, cam=cam, pose=pose)
+    assert "calibrated geometry" in text
+    text2 = render_route_map(seg, state, 5.0, True)
+    assert "assumed survey geometry" in text2

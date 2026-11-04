@@ -47,6 +47,7 @@ def drone_mission() -> Solver:
         elif perception == "sam":
             from dmb.perception.sam import (  # noqa: PLC0415
                 SAMEdgePerception,
+                ignition_point_proposer,
                 max_scans_from_env,
                 sam_from_env,
             )
@@ -57,6 +58,8 @@ def drone_mission() -> Solver:
                 FrameBudget(max_snapshots=8),
                 sam_from_env(),
                 max_scans=max_scans_from_env(),
+                point_proposer=ignition_point_proposer(bridge),
+                fuse_stub=settings.sam_fuse_stub,
             )
         else:
             raise ValueError(
@@ -65,19 +68,25 @@ def drone_mission() -> Solver:
         watcher = watcher_from_env(str(state.sample_id))
         watcher.on_start({**dict(state.metadata), "backend": backend, "perception": perception})
         tools: list[Tool] = make_drone_tools(bridge, edge, watcher)
-        agent = react(
-            prompt=(
-                "You are a disaster-response drone navigator piloting a "
-                "simulated drone through FUNCTION CALLS. Rules: act ONLY "
-                "through function calls — plain text changes nothing in the "
-                "simulator, so never narrate an action without emitting its "
-                "matching function call in the same turn. Use the flight "
-                "tools to search the area, rely on edge perception reports, "
-                "minimise steps, stay out of hazard zones, then land and "
-                "submit a summary of victim positions."
-            ),
-            tools=tools,
+        fleet_size = int(dict(state.metadata).get("fleet_size", 1) or 1)
+        prompt = (
+            "You are a disaster-response drone navigator piloting a "
+            "simulated drone through FUNCTION CALLS. Rules: act ONLY "
+            "through function calls — plain text changes nothing in the "
+            "simulator, so never narrate an action without emitting its "
+            "matching function call in the same turn. Use the flight "
+            "tools to search the area, rely on edge perception reports, "
+            "minimise steps, stay out of hazard zones, then land and "
+            "submit a summary of victim positions."
         )
+        if fleet_size > 1:
+            prompt += (
+                f" You command a fleet of {fleet_size} drones from spread "
+                "launch pads; every flight tool takes drone_idx (0-based). "
+                "Split the search: give each drone its own area, interleave "
+                "their moves, and land every drone you launched."
+            )
+        agent = react(prompt=prompt, tools=tools)
         # Hard cap: a model that never submits must still terminate.
         agent_state, _limit_error = await run(
             agent, state.messages, [message_limit(50)]
@@ -87,6 +96,17 @@ def drone_mission() -> Solver:
         final = bridge.get_state()
         state.store.set("sim_state", final)
         watcher.on_end({"state": final})
+        if perception == "sam" and getattr(edge, "last_seg_map", None) is not None:
+            try:
+                from dmb.perception.segmap import save_seg_artifacts  # noqa: PLC0415
+
+                frame = bridge.capture_frame("final-segmap")
+                if frame is not None:
+                    save_seg_artifacts(
+                        str(state.sample_id), frame, edge.last_seg_map
+                    )
+            except Exception:
+                pass  # footage must never fail the episode
         bridge.close()
         return state
 

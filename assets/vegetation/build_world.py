@@ -9,16 +9,26 @@ only), this builder grows a variative peat-swamp stand:
 * jittered poses, random yaw, per-instance scale,
 * species mix: oak overstory for peat scenarios (only verified
   broadleaf; pine/oak for generic scenarios),
-* NO grass understory: both pinned grass models are plane-based and
-  render black under ogre2 (see manifest),
+* NO grass understory meshes: both pinned grass models are
+  plane-based and render black under ogre2 (see manifest). The
+  grass-soil gradation comes from a real aerial texture instead (see
+  ground below),
 * real smoke: smoke_generator columns on ignition cells, dense-fog haze
   banks downwind, flame_column derivative (smoke config, orange
   diffuse -- the manifest's documented adaptation),
-* peat-tinted ground + linear scene fog for the Kalimantan haze.
+* peat ground textured with the CC0 aerial grass/soil mosaic
+  (aerial_grass_rock) + linear scene fog for the Kalimantan haze,
+* fire: one box-type flame bed (broad, low, textured -- no pillar)
+  + one thin smoke column per ignition on a burned-ground scorch
+  decal (point flames pillar uncontrollably in ogre2, so no point
+  flame is used at all),
+* people: the eval's human/child draw placed at the same cells
+  (standing-person / male-visitor meshes; animals stay grid-side --
+  no vetted real mesh).
 
-All meshes/textures/emitters come from assets/models (pinned in
-assets/manifest.yaml); only poses, scales, and the flame derivative's
-diffuse are generated.
+All meshes/textures/emitters come from assets/models and
+assets/textures (pinned in assets/manifest.yaml); only poses, scales,
+and the flame derivative's diffuse are generated.
 
 Usage: python assets/vegetation/build_world.py firms_peat_kalimantan_01
          --seed 7 --out /tmp/kalimantan --trees 1200
@@ -40,6 +50,22 @@ MIN_SPACING_M = 5.5
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 MODELS_DIR = REPO / "assets" / "models"
+TEXTURES_DIR = REPO / "assets" / "textures"
+
+# Fire shape (2026-11-04 debug: point emitters pillar to 100 m+
+# regardless of velocity/lifetime, but a box emitter with a broad
+# flat volume + near-zero velocity renders as a low textured firebed
+# with no pillar): one flame_bed box + one thin smoke column per
+# ignition on a dark burned-ground scorch decal.
+CLUSTER_SMOKES = 1
+CLUSTER_SMOKE_R = 3.0
+SCORCH_SIZE_M = 24.0
+
+# People meshes cycle for human/child victims (same eval draw as the
+# grid sim: fresh Random(seed) -> _place_victims, mirroring
+# build_samples). Animals have no vetted real mesh (the manifest's
+# animal-placeholder is procedural), so they stay grid-side only.
+PEOPLE_MESHES = ("standing-person", "male-visitor")
 
 # model:// URIs resolve by resource-path directory name, not model.config
 # <name> (fog-emitter's config name collides with smoke_generator's).
@@ -60,6 +86,15 @@ def load_scenario(scenario: str):
     from dmb.scenarios import load_scenario  # noqa: PLC0415
 
     return load_scenario(scenario)
+
+
+def eval_victims(scenario: str, seed: int) -> list[dict]:
+    """Victim draw identical to the eval harness (same seed stream)."""
+    sys.path.insert(0, str(REPO))
+    from dmb.scenarios import _place_victims, load_scenario  # noqa: PLC0415
+
+    config = load_scenario(scenario)
+    return _place_victims(random.Random(seed), config)
 
 
 def pick_species(rng: random.Random, mix) -> str:
@@ -207,23 +242,22 @@ def stage_emitters(out_models: Path) -> None:
         "<scale_rate>10</scale_rate>",
     ):
         assert marker in smoke_orig, f"upstream smoke SDF changed ({marker})"
-    # Smoke/flame SHAPE tuning (documented adaptations, see manifest):
-    # smoke keeps the model's velocity with denser rate/size/lifetime so
-    # the column reads continuous instead of dotted; flame is a compact
-    # fireball (low velocity, short life, dense rate) for a fire-vs-smoke
-    # read at survey altitude.
+    # Smoke SHAPE tuning (documented adaptations, see manifest):
+    # one thin column per ignition (tall smoke is correct). No point
+    # flame: point emitters pillar to 100 m+ in ogre2 no matter the
+    # velocity/lifetime (2026-11-04 debug); the flame_bed box below
+    # is the fire.
     for name, model_name, diffuse, rate, psize, life, v0, v1 in [
         (
             "smoke-generator",
             "smoke_generator",
             "0.7 0.7 0.7",
             30,
-            "2 2 2",
-            2.5,
-            10,
-            15,
+            "2.5 2.5 2.5",
+            3.0,
+            8,
+            12,
         ),
-        ("flame_column", "flame_column", FLAME_DIFFUSE, 40, "2 2 2", 0.8, 3, 5),
     ]:
         dest = out_models / name
         if dest.exists():
@@ -299,6 +333,74 @@ def stage_emitters(out_models: Path) -> None:
         + "</sdf>\n"
     )
 
+    # ground_tex: URI host for the pinned ground textures (never
+    # included as a model itself). model:// parse-time resolution is
+    # the same proven path as the emitter albedos above.
+    missing = [n for n in ("aerial_grass_rock.jpg", "burned_ground_01.jpg")
+               if not (TEXTURES_DIR / n).exists()]
+    if missing:
+        raise SystemExit(
+            f"missing ground textures {missing}; run "
+            "python assets/textures/fetch_textures.py first"
+        )
+    gtex = out_models / "ground_tex"
+    if gtex.exists():
+        shutil.rmtree(gtex)
+    (gtex / "materials" / "textures").mkdir(parents=True)
+    for n in ("aerial_grass_rock.jpg", "burned_ground_01.jpg"):
+        shutil.copy(TEXTURES_DIR / n, gtex / "materials" / "textures" / n)
+    (gtex / "model.config").write_text(
+        '<?xml version="1.0"?>\n<model>\n'
+        "  <name>ground_tex</name>\n"
+        "  <version>1.0</version>\n"
+        '  <sdf version="1.6">model.sdf</sdf>\n'
+        "  <description>Pinned CC0 ground textures (URI host only)."
+        "</description>\n</model>\n"
+    )
+    (gtex / "model.sdf").write_text(
+        '<?xml version="1.0" ?>\n<sdf version="1.6">\n'
+        '  <model name="ground_tex">\n'
+        "    <static>true</static>\n"
+        '    <link name="link"/>\n'
+        "  </model>\n</sdf>\n"
+    )
+
+    # flame_bed: box-type firebed (broad flat emission volume,
+    # ZERO velocity) -- renders as a low textured ember bed that
+    # never pillars (2026-11-04 rig: ogre2 ignores <lifetime>, so any
+    # vel > 0 grows a pillar of height vel x age; vel 0 is stable at
+    # 200 s+ with a faint quota-cycling shimmer). One per ignition.
+    bed = out_models / "flame_bed"
+    if bed.exists():
+        shutil.rmtree(bed)
+    shutil.copytree(MODELS_DIR / "smoke-generator", bed, symlinks=True)
+    (bed / "model.sdf").write_text(
+        '<?xml version="1.0" ?>\n<sdf version="1.6">\n'
+        + _legacy_emitter_block(
+            "flame_bed",
+            "flame_bed",
+            1.0,
+            0,
+            0,
+            1,
+            60,
+            "2 2 2",
+            FLAME_DIFFUSE,
+            "model://flame_bed/materials/textures/smoke.png",
+            emitter_type="box",
+            emitter_pose="0 0 0 0 -1.5707 0",
+            emitter_size="14 14 1.5",
+            model_pose="0 0 0 0 0 0",
+        )
+        + "</sdf>\n"
+    )
+    cfg = bed / "model.config"
+    cfg.write_text(
+        cfg.read_text().replace(
+            "<name>smoke_generator</name>", "<name>flame_bed</name>"
+        )
+    )
+
 def world_sdf(
     name: str,
     w_m: float,
@@ -306,6 +408,8 @@ def world_sdf(
     trees: list[dict],
     ign_m: list[tuple[float, float]],
     wind: tuple[float, float],
+    seed: int = 1,
+    victims: list[dict] | None = None,
 ) -> str:
     cx, cy = w_m / 2, h_m / 2
     lines = [
@@ -343,9 +447,11 @@ def world_sdf(
         "      </fog>",
         "      <sky/>",
         "    </scene>",
-        # Peat ground: dark organic slab under the grass texture patches.
-        # A thin box, not <plane>: plane visuals render black under ogre2
-        # (debug render 2026-11-04), boxes with the same material are fine.
+        # Peat ground: real aerial grass/soil mosaic (CC0, pinned in
+        # the manifest), staged under model://ground_tex. A thin box,
+        # not <plane>: plane visuals render black under ogre2 (debug
+        # render 2026-11-04), boxes with the same material are fine.
+        # Diffuse is a near-white warm tint over the albedo.
         '    <model name="peat_ground">',
         "      <static>true</static>",
         f'      <pose>{cx} {cy} -0.05 0 0 0</pose>',
@@ -356,8 +462,13 @@ def world_sdf(
         '        <visual name="visual">',
         f"          <geometry><box><size>{w_m} {h_m} 0.1</size></box></geometry>",
         "          <material>",
-        "            <ambient>0.13 0.09 0.06 1</ambient>",
-        "            <diffuse>0.15 0.10 0.07 1</diffuse>",
+        "            <ambient>0.85 0.80 0.70 1</ambient>",
+        "            <diffuse>1.0 0.96 0.88 1</diffuse>",
+        "            <pbr>",
+        "              <metal>",
+        "                <albedo_map>model://ground_tex/materials/textures/aerial_grass_rock.jpg</albedo_map>",
+        "              </metal>",
+        "            </pbr>",
         "          </material>",
         "        </visual>",
         "      </link>",
@@ -377,17 +488,49 @@ def world_sdf(
     # render black under ogre2 (grass-plane is also a 500 m sprawl, not
     # a tuft). Understory awaits a mesh-based tuft asset.
     for i, (ix, iy) in enumerate(ign_m):
+        # Fire: one box firebed on the ignition + one thin smoke
+        # column with a small seeded offset, on a dark scorch decal.
+        crng = random.Random(seed * 7919 + i)
         lines += [
             "    <include>",
-            f"      <name>fire_smoke_{i}</name>",
-            "      <uri>model://smoke-generator</uri>",
+            f"      <name>fire_bed_{i}</name>",
+            "      <uri>model://flame_bed</uri>",
             f"      <pose>{ix} {iy} 1 0 0 0</pose>",
             "    </include>",
-            "    <include>",
-            f"      <name>fire_flame_{i}</name>",
-            "      <uri>model://flame_column</uri>",
-            f"      <pose>{ix + 2} {iy + 1} 0.5 0 0 0</pose>",
-            "    </include>",
+        ]
+        for j in range(CLUSTER_SMOKES):
+            sx = ix + crng.uniform(-CLUSTER_SMOKE_R, CLUSTER_SMOKE_R)
+            sy = iy + crng.uniform(-CLUSTER_SMOKE_R, CLUSTER_SMOKE_R)
+            lines += [
+                "    <include>",
+                f"      <name>fire_smoke_{i}_{j}</name>",
+                "      <uri>model://smoke-generator</uri>",
+                f"      <pose>{sx:.1f} {sy:.1f} 1 0 0 0</pose>",
+                "    </include>",
+            ]
+        s = SCORCH_SIZE_M
+        lines += [
+            f'    <model name="scorch_{i}">',
+            "      <static>true</static>",
+            f"      <pose>{ix} {iy} 0.03 0 0 0</pose>",
+            '      <link name="link">',
+            '        <collision name="collision">',
+            f"          <geometry><box><size>{s} {s} 0.06</size></box></geometry>",
+            "        </collision>",
+            '        <visual name="visual">',
+            f"          <geometry><box><size>{s} {s} 0.06</size></box></geometry>",
+            "          <material>",
+            "            <ambient>0.5 0.5 0.5 1</ambient>",
+            "            <diffuse>0.9 0.9 0.9 1</diffuse>",
+            "            <pbr>",
+            "              <metal>",
+            "                <albedo_map>model://ground_tex/materials/textures/burned_ground_01.jpg</albedo_map>",
+            "              </metal>",
+            "            </pbr>",
+            "          </material>",
+            "        </visual>",
+            "      </link>",
+            "    </model>",
         ]
         hx, hy = ix + wind[0] * 60, iy + wind[1] * 60
         lines += [
@@ -395,6 +538,20 @@ def world_sdf(
             f"      <name>haze_bank_{i}</name>",
             "      <uri>model://fog-emitter-dense</uri>",
             f"      <pose>{hx:.1f} {hy:.1f} 4 0 0 0</pose>",
+            "    </include>",
+        ]
+    # People: the eval's human/child draw, same cells as the grid sim.
+    vrng = random.Random(seed * 104729 + 7)
+    for k, v in enumerate(victims or []):
+        if v.get("category") not in ("human", "child"):
+            continue
+        mesh = PEOPLE_MESHES[k % len(PEOPLE_MESHES)]
+        vx, vy = float(v["x"]) * CELL_M, float(v["y"]) * CELL_M
+        lines += [
+            "    <include>",
+            f"      <name>victim_{k}_{v['category']}</name>",
+            f"      <uri>model://{mesh}</uri>",
+            f"      <pose>{vx:.1f} {vy:.1f} 0 0 0 {vrng.uniform(-3.14, 3.14):.3f}</pose>",
             "    </include>",
         ]
     lines += ["  </world>", "</sdf>"]
@@ -419,10 +576,14 @@ def build(
     rng = random.Random(seed)
     clearings = seed_clearings(rng, w_m, h_m, ign)
     trees = place_trees(rng, w_m, h_m, trees_target, clearings, mix)
+    victims = eval_victims(scenario, seed)
 
     out.mkdir(parents=True, exist_ok=True)
     (out / "world.sdf").write_text(
-        world_sdf(f"{scenario}_{seed}", w_m, h_m, trees, ign, wind)
+        world_sdf(
+            f"{scenario}_{seed}", w_m, h_m, trees, ign, wind, seed,
+            victims,
+        )
     )
     ET.fromstring((out / "world.sdf").read_text())  # fail fast on bad XML
     fuel_default = float(fire.get("fuel_default", 0.0))
@@ -439,15 +600,18 @@ def build(
                 "clearings": clearings,
                 "ignitions_m": ign,
                 "trees": trees,
+                "victims": victims,
             },
             indent=2,
         )
     )
     stage_emitters(out / "models")
+    people = [v for v in victims if v.get("category") in ("human", "child")]
     stats = {
         "trees": len(trees),
         "clearings": len(clearings),
-        "emitters": 3 * len(ign),
+        "emitters": (1 + CLUSTER_SMOKES + 1) * len(ign),
+        "victim_actors": len(people),
         "species": {s: sum(1 for t in trees if t["species"] == s) for s, _ in mix},
     }
     (out / "stats.json").write_text(json.dumps(stats, indent=2))

@@ -118,7 +118,9 @@ class MockBridge(SimBridge):
     def __init__(self, step_budget: int = 60, battery_drain_per_step: float = 1.0) -> None:
         self.step_budget = step_budget
         self.battery_drain = battery_drain_per_step
-        self.drone = DroneState()
+        self.drones = [DroneState()]
+        self.drone = self.drones[0]
+        self._launch_spots = [(0, 0)]
         self.victims: list[Victim] = []
         self.hazards: list[dict] = []
         self.phases: list[dict] = []
@@ -169,15 +171,32 @@ class MockBridge(SimBridge):
         self.victims = [Victim(**v) for v in metadata.get("victim_placements", [])]
         self.hazards = list(metadata.get("hazards", []))
         self.phases = list(metadata.get("difficulty", {}).get("phases", []))
-        self.drone = DroneState(battery_pct=100.0)
+        fleet_size = int(metadata.get("fleet_size", 1))
+        if fleet_size < 1:
+            raise ValueError(f"fleet_size must be >= 1 (got {fleet_size})")
+        corners = [
+            (0, 0),
+            (self.width - 1, 0),
+            (0, self.height - 1),
+            (self.width - 1, self.height - 1),
+        ]
+        self._launch_spots = [corners[i % len(corners)] for i in range(fleet_size)]
+        self.drones = [
+            DroneState(x=lx, y=ly, battery_pct=100.0)
+            for lx, ly in self._launch_spots
+        ]
+        self.drone = self.drones[0]
         self.steps = 0
         self.sim_time = 0.0
         self.safety_violations = 0
         self._announced_phase = None
-        self._visited = {(0, 0)}
+        self._visited = set(self._launch_spots)
         self.first_find_step = None
         self._init_dynamics(metadata.get("dynamics", {}))
-        return self._observe("Episode start. Drone on pad at (0, 0), disarmed.")
+        if fleet_size == 1:
+            return self._observe("Episode start. Drone on pad at (0, 0), disarmed.")
+        pads = ", ".join(f"#{i}@({x},{y})" for i, (x, y) in enumerate(self._launch_spots))
+        return self._observe(f"Episode start. Fleet of {fleet_size} on pads: {pads}.")
 
     # -- primitives -----------------------------------------------------
     def _tick(self) -> None:
@@ -185,8 +204,11 @@ class MockBridge(SimBridge):
         # Nominal 5 sim-seconds per action on the mock backend; SITL maps
         # wall time. Watcher `t` fields use this clock.
         self.sim_time += 5.0
-        if self.drone.airborne:
-            self.drone.battery_pct = max(0.0, self.drone.battery_pct - self.battery_drain)
+        # Every airborne drone burns: actions are sequential in the log
+        # but simultaneous in wall time (parallel-time model).
+        for drone in self.drones:
+            if drone.airborne:
+                drone.battery_pct = max(0.0, drone.battery_pct - self.battery_drain)
         self._step_dynamics()
 
     def _init_dynamics(self, config: dict) -> None:
@@ -266,66 +288,87 @@ class MockBridge(SimBridge):
                 return True
         return False
 
-    def arm(self) -> Observation:
-        self.drone.armed = True
-        return self._observe("Armed.")
+    @property
+    def any_airborne(self) -> bool:
+        """True when at least one fleet drone is flying."""
+        return any(d.airborne for d in self.drones)
 
-    def takeoff(self, altitude_m: float) -> Observation:
-        if not self.drone.armed:
-            return self._observe("Refused: arm before takeoff.")
+    def _drone(self, idx: int) -> DroneState:
+        if not 0 <= idx < len(self.drones):
+            raise IndexError(f"drone_idx {idx} out of range (fleet {len(self.drones)})")
+        return self.drones[idx]
+
+    def arm(self, idx: int = 0) -> Observation:
+        self._drone(idx).armed = True
+        return self._observe("Armed.", idx)
+
+    def takeoff(self, altitude_m: float, idx: int = 0) -> Observation:
+        drone = self._drone(idx)
+        if not drone.armed:
+            return self._observe("Refused: arm before takeoff.", idx)
         if altitude_m <= 0:
-            return self._observe("Refused: altitude must be positive.")
-        self.drone.airborne = True
-        self.drone.altitude_m = altitude_m
+            return self._observe("Refused: altitude must be positive.", idx)
+        drone.airborne = True
+        drone.altitude_m = altitude_m
         self._tick()
-        return self._observe(f"Takeoff to {altitude_m:.1f} m.")
+        return self._observe(f"Takeoff to {altitude_m:.1f} m.", idx)
 
-    def goto(self, x: int, y: int) -> Observation:
-        if not self.drone.airborne:
-            return self._observe("Refused: not airborne.")
-        self.drone.x = max(0, min(self.width - 1, x))
-        self.drone.y = max(0, min(self.height - 1, y))
-        self._visited.add((self.drone.x, self.drone.y))
+    def goto(self, x: int, y: int, idx: int = 0) -> Observation:
+        drone = self._drone(idx)
+        if not drone.airborne:
+            return self._observe("Refused: not airborne.", idx)
+        drone.x = max(0, min(self.width - 1, x))
+        drone.y = max(0, min(self.height - 1, y))
+        self._visited.add((drone.x, drone.y))
         self._tick()
-        if self._in_hazard(self.drone.x, self.drone.y):
+        if self._in_hazard(drone.x, drone.y):
             self.safety_violations += 1
             return self._observe(
-                f"Moved to ({self.drone.x}, {self.drone.y}). WARNING: hazard zone."
+                f"Moved to ({drone.x}, {drone.y}). WARNING: hazard zone.", idx
             )
-        return self._observe(f"Moved to ({self.drone.x}, {self.drone.y}).")
+        return self._observe(f"Moved to ({drone.x}, {drone.y}).", idx)
 
-    def loiter(self, seconds: int = 5) -> Observation:
-        if not self.drone.airborne:
-            return self._observe("Refused: not airborne.")
+    def loiter(self, seconds: int = 5, idx: int = 0) -> Observation:
+        drone = self._drone(idx)
+        if not drone.airborne:
+            return self._observe("Refused: not airborne.", idx)
         self._tick()
-        return self._observe(f"Loitering {seconds}s at ({self.drone.x}, {self.drone.y}).")
+        return self._observe(f"Loitering {seconds}s at ({drone.x}, {drone.y}).", idx)
 
-    def land(self) -> Observation:
-        self.drone.airborne = False
-        self.drone.altitude_m = 0.0
+    def land(self, idx: int = 0) -> Observation:
+        drone = self._drone(idx)
+        drone.airborne = False
+        drone.altitude_m = 0.0
         self._tick()
-        return self._observe(f"Landed at ({self.drone.x}, {self.drone.y}).")
+        return self._observe(f"Landed at ({drone.x}, {drone.y}).", idx)
 
-    def rtl(self) -> Observation:
-        self.drone.x, self.drone.y = 0, 0
-        self.drone.airborne = False
-        self.drone.altitude_m = 0.0
+    def rtl(self, idx: int = 0) -> Observation:
+        drone = self._drone(idx)
+        drone.x, drone.y = self._launch_spots[idx]
+        drone.airborne = False
+        drone.altitude_m = 0.0
         self._tick()
-        return self._observe("Returned to launch and landed.")
+        return self._observe("Returned to launch and landed.", idx)
 
     # -- interface ------------------------------------------------------
     def act(self, action: str, params: dict) -> Observation:
+        params = params or {}
+        try:
+            idx = int(params.get("drone_idx", 0))
+            self._drone(idx)
+        except (ValueError, IndexError):
+            return self._observe(f"Unknown drone_idx: {params.get('drone_idx')!r}")
         handler = {
-            "arm": lambda p: self.arm(),
-            "takeoff": lambda p: self.takeoff(float(p.get("altitude_m", 10.0))),
-            "goto": lambda p: self.goto(int(p["x"]), int(p["y"])),
-            "loiter": lambda p: self.loiter(int(p.get("seconds", 5))),
-            "land": lambda p: self.land(),
-            "rtl": lambda p: self.rtl(),
+            "arm": lambda p: self.arm(idx),
+            "takeoff": lambda p: self.takeoff(float(p.get("altitude_m", 10.0)), idx),
+            "goto": lambda p: self.goto(int(p["x"]), int(p["y"]), idx),
+            "loiter": lambda p: self.loiter(int(p.get("seconds", 5)), idx),
+            "land": lambda p: self.land(idx),
+            "rtl": lambda p: self.rtl(idx),
         }.get(action)
         if handler is None:
             return self._observe(f"Unknown action: {action}")
-        return handler(params or {})
+        return handler(params)
 
     def victims_within(self, radius: float) -> list[Victim]:
         return [
@@ -341,18 +384,20 @@ class MockBridge(SimBridge):
         if self.first_find_step is None:
             self.first_find_step = self.steps
 
-    def _observe(self, event: str) -> Observation:
+    def _observe(self, event: str, idx: int = 0) -> Observation:
         phase = self.current_phase()
         if phase != self._announced_phase:
             self._announced_phase = phase
             event = f"{event} [phase: {phase}]"
+        drone = self.drones[idx] if 0 <= idx < len(self.drones) else self.drone
         telemetry = {
-            "x": self.drone.x,
-            "y": self.drone.y,
-            "altitude_m": self.drone.altitude_m,
-            "armed": self.drone.armed,
-            "airborne": self.drone.airborne,
-            "battery_pct": round(self.drone.battery_pct, 1),
+            "drone_idx": idx,
+            "x": drone.x,
+            "y": drone.y,
+            "altitude_m": drone.altitude_m,
+            "armed": drone.armed,
+            "airborne": drone.airborne,
+            "battery_pct": round(drone.battery_pct, 1),
             "steps": self.steps,
             "safety_violations": self.safety_violations,
             "phase": phase,
@@ -368,10 +413,37 @@ class MockBridge(SimBridge):
             return "terrain"
         return "fire"
 
+    @property
+    def survey_camera(self):  # -> SurveyFrame | None (render_frames)
+        """Pre-rendered survey frame + camera, if one covers this episode.
+
+        Cached on first capture; None keeps the legacy map render.
+        """
+        return getattr(self, "_survey", None)
+
+    @property
+    def burning_cells(self) -> list[tuple[int, int]]:
+        """Burning or smoldering cells (fire model), sorted, deterministic.
+
+        Peat ignitions start underground (smolder) with surface breakout
+        later; both stages count as fire for point-prompt seeding.
+        """
+        fire = getattr(self, "_fire", None)
+        ignited = getattr(fire, "ignited", {}) or {}
+        smolder = getattr(fire, "smolder", {}) or {}
+        return sorted(set(ignited) | set(smolder))
+
     def capture_frame(self, ref: str) -> bytes | None:
         """PNG bytes for an observation frame, or None if unavailable."""
         from dmb.perception.frames import render_map_frame  # noqa: PLC0415
+        from dmb.perception.render_frames import survey_frame  # noqa: PLC0415
 
+        key = (self.scenario, self.seed)
+        if getattr(self, "_survey_key", None) != key:
+            self._survey = survey_frame(self.scenario, self.seed)
+            self._survey_key = key
+        if self._survey is not None:
+            return self._survey.png
         state = self.get_state()
         state["danger_kind"] = self._danger_kind()
         return render_map_frame(state, {"width": self.width, "height": self.height})
@@ -397,6 +469,18 @@ class MockBridge(SimBridge):
                 "airborne": self.drone.airborne,
                 "battery_pct": self.drone.battery_pct,
             },
+            "fleet_size": len(self.drones),
+            "drones": [
+                {
+                    "x": d.x,
+                    "y": d.y,
+                    "altitude_m": d.altitude_m,
+                    "armed": d.armed,
+                    "airborne": d.airborne,
+                    "battery_pct": d.battery_pct,
+                }
+                for d in self.drones
+            ],
             "victims": [
                 {
                     "category": v.category,
@@ -717,7 +801,7 @@ class GazeboSITLBridge(MockBridge):
         }
 
     # -- primitives (real flight) ---------------------------------------
-    def arm(self) -> Observation:
+    def arm(self, idx: int = 0) -> Observation:
         assert self._mav is not None
         if not self._set_mode("GUIDED"):
             return self._observe("Refused: GUIDED mode rejected.")
@@ -742,7 +826,7 @@ class GazeboSITLBridge(MockBridge):
             return self._observe(f"Refused: arming failed ({last_prearm}).")
         return self._observe("Armed in GUIDED.")
 
-    def takeoff(self, altitude_m: float) -> Observation:
+    def takeoff(self, altitude_m: float, idx: int = 0) -> Observation:
         assert self._mav is not None
         mavutil = _require_pymavlink()
         if not self.drone.armed:
@@ -770,7 +854,7 @@ class GazeboSITLBridge(MockBridge):
             return self._observe(f"Takeoff incomplete: {alt:.1f}m.")
         return self._observe(f"Takeoff to {alt:.1f} m.")
 
-    def goto(self, x: int, y: int) -> Observation:
+    def goto(self, x: int, y: int, idx: int = 0) -> Observation:
         assert self._mav is not None
         mavutil = _require_pymavlink()
         if not self.drone.airborne:
@@ -814,7 +898,7 @@ class GazeboSITLBridge(MockBridge):
         status = "Arrived" if arrived else "En route"
         return self._observe(f"{status} ({self.drone.x}, {self.drone.y}).")
 
-    def loiter(self, seconds: int = 5) -> Observation:
+    def loiter(self, seconds: int = 5, idx: int = 0) -> Observation:
         if not self.drone.airborne:
             return self._observe("Refused: not airborne.")
         time.sleep(min(seconds, 30))
@@ -822,7 +906,7 @@ class GazeboSITLBridge(MockBridge):
         self._sync_from_telemetry()
         return self._observe(f"Loitered at ({self.drone.x}, {self.drone.y}).")
 
-    def land(self) -> Observation:
+    def land(self, idx: int = 0) -> Observation:
         if not self._set_mode("LAND", timeout=15):
             return self._observe("Refused: LAND mode rejected.")
         deadline = time.time() + 90
@@ -840,7 +924,7 @@ class GazeboSITLBridge(MockBridge):
         self._sync_from_telemetry()
         return self._observe(f"Landed at ({self.drone.x}, {self.drone.y}).")
 
-    def rtl(self) -> Observation:
+    def rtl(self, idx: int = 0) -> Observation:
         if not self._set_mode("RTL", timeout=15):
             return self._observe("Refused: RTL mode rejected.")
         deadline = time.time() + 120

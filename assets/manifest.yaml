@@ -53,7 +53,7 @@ emitters:
     version: 2
     sha256: 5170fd23e85a083ad10aae18f6d446d908ec0110d4b595f8379d832e26dd1493
     license: CC-BY-4.0
-    use: T1 smoke texture (smoke.png) + emitter numerics; Harmonic ignores model plugin blocks so build_world.py rehosts the model's own params in SDF particle_emitter elements. Smoke rate/size/lifetime tuned for column continuity (30/2m/2.5s); flames are a compact fireball (orange diffuse, 40/s, 2m, 0.8s, 3-5m/s) for the fire-vs-smoke read (documented adaptations).
+    use: T1 smoke texture (smoke.png) + emitter numerics; Harmonic ignores model plugin blocks so build_world.py rehosts the model's own params in SDF particle_emitter elements. Smoke runs as one thin column (30/2.5m/3.0s, 8-12m/s). Ogre2 ignores <lifetime>, so any vel > 0 grows a pillar of height vel x age (2026-11-04 rig); the fire is therefore a ZERO-velocity box-type flame_bed (14x14x1.5 m volume, orange diffuse, 60/s, 2m) on a dark burned-ground scorch decal -- low, broad, textured, pillar-free and stable at 200 s+ (documented adaptations).
 actors:
   standing-person:
     url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Standing%20person/3/Standing%20person.zip
@@ -81,6 +81,17 @@ drones:
     params: https://github.com/ArduPilot/ardupilot/blob/Copter-4.6.3/Tools/autotest/default_params/gazebo-zephyr.parm
     model: https://github.com/ArduPilot/ardupilot_gazebo/blob/80dc9664/models/zephyr_with_ardupilot/model.sdf
     license: GPL-3.0 (ArduPilot sources)
+textures:
+  aerial_grass_rock:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/aerial_grass_rock/aerial_grass_rock_diff_4k.jpg
+    sha256: 84bf24b80d097c1a38d0fbe5c84584b1ede3e2ab06b4af2721fd184a9f94d5a3
+    license: CC0-1.0
+    use: peat ground albedo (aerial moss-grass/soil mosaic; the grass-soil gradation). Fetched by assets/textures/fetch_textures.py, staged into worlds as model://ground_tex/... (same parse-time resolution as emitter albedos).
+  burned_ground_01:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/burned_ground_01/burned_ground_01_diff_4k.jpg
+    sha256: d5cde28f8a7ad34ab3dcea8dc0f4ed836c16688e96c40695c760dfb052b46e89
+    license: CC0-1.0
+    use: scorch decals under fire clusters. Same fetch/stage path as aerial_grass_rock.
 gis:
   # Peatforest tile C (#64): bbox [114.318, -2.86, 114.336, -2.842].
   # Files live in data/peatforest/ (untracked bulk); pins reference
