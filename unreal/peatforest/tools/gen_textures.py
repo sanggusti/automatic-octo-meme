@@ -36,14 +36,19 @@ def leaf_card(rng):
     # a sparse card (28% cover) masked whole crowns away (trees rendered
     # as sticks). Opaque dark base + layered leaflets + a few punched
     # depth holes (~8%): reads as a closed crown with interior shadow.
-    img = Image.new("RGBA", (SIZE, SIZE), (14, 42, 18, 255))
+    # Wrapped + deep: blobs tile this 4x2, so leaflets must wrap
+    # seamlessly; deep base + mid greens read as shaded crown mass.
+    img = Image.new("RGBA", (SIZE, SIZE), (9, 30, 12, 255))
     dr = ImageDraw.Draw(img)
-    for _ in range(460):
+    for _ in range(520):
         cx, cy = rng.uniform(0, SIZE), rng.uniform(0, SIZE)
-        a, b = rng.uniform(10, 26), rng.uniform(5, 11)
-        g = rng.uniform(0.3, 0.75)
-        col = (int(40 * g / 0.5), int(128 * g / 0.5), int(54 * g / 0.5), 255)
-        dr.ellipse([cx - a, cy - b, cx + a, cy + b], fill=col, outline=None)
+        a, b = rng.uniform(9, 22), rng.uniform(4, 10)
+        g = rng.uniform(0.25, 0.62)
+        col = (int(36 * g / 0.5), int(116 * g / 0.5), int(48 * g / 0.5), 255)
+        for ox in (-SIZE, 0, SIZE):
+            for oy in (-SIZE, 0, SIZE):
+                dr.ellipse([cx - a + ox, cy - b + oy, cx + a + ox, cy + b + oy],
+                           fill=col, outline=None)
     for _ in range(90):
         x, y = rng.uniform(0, SIZE), rng.uniform(0, SIZE)
         dr.line([x - 7, y, x + 7, y], fill=(18, 58, 24, 255), width=2)
@@ -80,42 +85,64 @@ def frond(rng):
 
 
 def flame(rng):
+    # Dense multi-tongue sheet: 5 columns with individual heights so the
+    # cone reads as fire, not a translucent scrim (diagnosed live v2.2).
+    # v=1 at the bottom (hottest at the base); ember boost at the foot.
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     px = img.load()
-    tongues = [rng.uniform(0.5, 1.0) for _ in range(9)]
+    cols = 5
+    peaks = [rng.uniform(0.55, 1.0) for _ in range(cols)]
+    wobs = [rng.uniform(0, 6.28) for _ in range(cols)]
     for y in range(SIZE):
-        v = y / SIZE  # 1 at bottom (hottest at the base)
+        v = y / SIZE
         for x in range(SIZE):
             u = x / SIZE
-            wob = sum(t * math.sin(u * math.pi * (i + 2) + t * 6.0)
-                      for i, t in enumerate(tongues)) / len(tongues)
-            body = v * (0.75 + 0.35 * wob) - abs(u - 0.5) * 1.1
-            if body <= 0:
+            heat = 0.0
+            for i in range(cols):
+                cx = (i + 0.5) / cols
+                w = 0.17 + 0.04 * math.sin(wobs[i] + v * 5.0)
+                d = abs(u - cx)
+                if d >= w:
+                    continue
+                h = peaks[i] * (0.88 + 0.12 * math.sin(wobs[i] * 2 + v * 9.0))
+                base = 1.0 - h
+                if v <= base:
+                    continue
+                cand = ((v - base) / h) * (1 - (d / w) ** 2)
+                heat = max(heat, cand)
+            if v > 0.92:  # ember foot
+                heat = max(heat, (v - 0.92) / 0.08 * 0.95)
+            if heat <= 0.02:
                 continue
-            heat = min(1.0, body * 1.6)
-            if heat > 0.75:
-                col = (255, 246, 214)
-            elif heat > 0.5:
-                col = (255, 196, 64)
-            elif heat > 0.28:
-                col = (255, 122, 26)
+            heat = min(1.0, heat)
+            if heat > 0.8:
+                col = (255, 232, 170)
+            elif heat > 0.55:
+                col = (255, 150, 30)
+            elif heat > 0.3:
+                col = (230, 70, 15)
             else:
-                col = (214, 48, 12)
-            px[x, y] = col + (int(255 * min(1.0, body * 2.2)),)
-    return img.filter(ImageFilter.GaussianBlur(1.2))
+                col = (180, 30, 10)
+            px[x, y] = col + (int(255 * min(1.0, heat * 2.6)),)
+    return img.filter(ImageFilter.GaussianBlur(1.0))
 
 
 def smoke(rng):
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     layer = Image.new("L", (SIZE, SIZE), 0)
     dl = ImageDraw.Draw(layer)
-    for _ in range(26):
-        cx = rng.uniform(SIZE * 0.3, SIZE * 0.7)
-        cy = rng.uniform(SIZE * 0.25, SIZE * 0.75)
-        r = rng.uniform(40, 110)
-        dl.ellipse([cx - r, cy - r, cx + r, cy + r], fill=rng.randint(90, 170))
-    layer = layer.filter(ImageFilter.GaussianBlur(18))
-    grey = Image.new("RGB", (SIZE, SIZE), (168, 160, 150))
+    for _ in range(42):
+        cx = rng.uniform(SIZE * 0.28, SIZE * 0.72)
+        cy = rng.uniform(SIZE * 0.2, SIZE * 0.8)
+        r = rng.uniform(36, 100)
+        dl.ellipse([cx - r, cy - r, cx + r, cy + r], fill=rng.randint(130, 210))
+    for _ in range(14):  # dark core puffs
+        cx = rng.uniform(SIZE * 0.38, SIZE * 0.62)
+        cy = rng.uniform(SIZE * 0.35, SIZE * 0.65)
+        r = rng.uniform(22, 55)
+        dl.ellipse([cx - r, cy - r, cx + r, cy + r], fill=rng.randint(190, 235))
+    layer = layer.filter(ImageFilter.GaussianBlur(12))
+    grey = Image.new("RGB", (SIZE, SIZE), (64, 55, 46))
     img.paste(grey, (0, 0), layer)
     return img
 

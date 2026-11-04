@@ -25,25 +25,35 @@ HOTSPOT_R_M = 250.0
 
 class Part:
     def __init__(self):
-        self.v, self.vt, self.f = [], [], []
+        self.v, self.vt, self.vn, self.f = [], [], [], []
 
-    def vert(self, x, y, z, u, vv, tint):
+    def vert(self, x, y, z, u, vv, tint, n):
         self.v.append((x, y, z, *tint))
         self.vt.append((u, vv))
-        return len(self.v)  # 1-based, v[i] <-> vt[i]
+        self.vn.append(n)
+        return len(self.v)  # 1-based, v[i] <-> vt[i] <-> vn[i]
 
     def tri(self, a, b, c):
         self.f.append((a, b, c))
 
     def write(self, path):
+        # Smooth analytic normals: without vn the importer shades each
+        # lat band flat, striping every crown (diagnosed live).
         with open(path, "w") as fh:
             fh.write(f"# peatforest {Path(path).stem}\n")
             for x, y, z, r, g, b in self.v:
                 fh.write(f"v {x:.1f} {y:.1f} {z:.1f} {r:.3f} {g:.3f} {b:.3f}\n")
             for u, vv in self.vt:
                 fh.write(f"vt {u:.4f} {vv:.4f}\n")
+            for nx, ny, nz in self.vn:
+                fh.write(f"vn {nx:.4f} {ny:.4f} {nz:.4f}\n")
             for a, b, c in self.f:
-                fh.write(f"f {a}/{a} {b}/{b} {c}/{c}\n")
+                fh.write(f"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}\n")
+
+
+def normed(x, y, z):
+    L = math.sqrt(x * x + y * y + z * z) or 1.0
+    return (x / L, y / L, z / L)
 
 
 def yawed(dx, dy, ang):
@@ -60,8 +70,10 @@ def tube(part, cx, cy, cz, r0, r1, h, tint, lean=(0.0, 0.0), vscale=1.0):
         for i in range(SIDES):
             a = 2 * math.pi * i / SIDES
             dx, dy = yawed(r * math.cos(a), r * math.sin(a), 0.0)
+            nx, ny = yawed(math.cos(a), math.sin(a), 0.0)
             ring.append(part.vert(cx + dx + lean[0] * t, cy + dy + lean[1] * t,
-                                  cz + h * t, i / SIDES, t * vscale, tint))
+                                  cz + h * t, i / SIDES, t * vscale, tint,
+                                  normed(nx, ny, 0.12)))
         ids.append(ring)
     for r in range(len(ids) - 1):
         for i in range(SIDES):
@@ -85,10 +97,12 @@ def blob(part, cx, cy, cz, rx, ry, rz, tint, seed_ang=0.0, detail=(12, 7)):
             dy = ry * math.sin(phi) * math.sin(th)
             dz = rz * math.cos(phi)
             ring.append(part.vert(cx + dx, cy + dy, cz + dz,
-                                  i / nlon, j / nlat, tint))
+                                  i / nlon * 4.0, j / nlat * 2.0, tint,
+                                  normed(dx / (rx * rx), dy / (ry * ry),
+                                         dz / (rz * rz))))
         grid.append(ring)
-    top = part.vert(cx, cy, cz + rz, 0.5, 1.0, tint)
-    bot = part.vert(cx, cy, cz - rz, 0.5, 0.0, tint)
+    top = part.vert(cx, cy, cz + rz, 2.0, 2.0, tint, (0.0, 0.0, 1.0))
+    bot = part.vert(cx, cy, cz - rz, 2.0, 0.0, tint, (0.0, 0.0, -1.0))
     for i in range(nlon):
         part.tri(grid[0][i], grid[0][(i + 1) % nlon], top)
     for r in range(len(grid) - 1):
@@ -115,9 +129,9 @@ def frond(part, cx, cy, cz, length, width, yaw, pitch0, tint):
         px, py = yawed(along, 0.0, yaw)
         qx, qy = yawed(0.0, 1.0, yaw)
         ids.append((part.vert(cx + px - qx * w, cy + py - qy * w, cz + up,
-                              t, 0.0, tint),
+                              t, 0.0, tint, (0.0, 0.0, 1.0)),
                     part.vert(cx + px + qx * w, cy + py + qy * w, cz + up,
-                              t, 1.0, tint)))
+                              t, 1.0, tint, (0.0, 0.0, 1.0))))
     for s in range(n):
         a0, a1 = ids[s]
         b0, b1 = ids[s + 1]

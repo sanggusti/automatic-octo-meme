@@ -59,7 +59,8 @@ def sample_height(heights, east_m, north_m):
             + hs[y0 + 1][x0] * (1 - tx) * ty + hs[y0 + 1][x0 + 1] * tx * ty)
 
 
-def import_mesh(obj_path, dest_dir, name, complex_collision=False):
+def import_mesh(obj_path, dest_dir, name, complex_collision=False,
+                nanite=True):
     full = f"{dest_dir}/{name}"
     if unreal.EditorAssetLibrary.does_asset_exist(full):
         unreal.EditorAssetLibrary.delete_asset(full)
@@ -82,13 +83,14 @@ def import_mesh(obj_path, dest_dir, name, complex_collision=False):
     mesh = unreal.EditorAssetLibrary.load_asset(full)
     if mesh is None:
         raise RuntimeError(f"mesh import failed: {name}")
-    try:
-        st = mesh.get_editor_property("nanite_settings")
-        st.set_editor_property("enabled", True)
-        mesh.set_editor_property("nanite_settings", st)
-        unreal.EditorAssetLibrary.save_asset(full)
-    except Exception as exc:  # noqa: BLE001 - nanite is garnish
-        log(f"nanite unavailable on {name} ({exc}); standard mesh stands")
+    if nanite:
+        try:
+            st = mesh.get_editor_property("nanite_settings")
+            st.set_editor_property("enabled", True)
+            mesh.set_editor_property("nanite_settings", st)
+            unreal.EditorAssetLibrary.save_asset(full)
+        except Exception as exc:  # noqa: BLE001 - nanite is garnish
+            log(f"nanite unavailable on {name} ({exc}); standard mesh stands")
     if complex_collision:
         try:
             mesh.get_editor_property("body_setup").set_editor_property(
@@ -176,7 +178,7 @@ def make_materials(data):
         assert ok, f"{tag}: connect {pin} -> {prop} failed"
 
     def wire_uv(mat, texture, scale=None, scroll=None):
-        """Sample with optional UV tiling (texcoord x const) / scroll."""
+        """Sample with optional UV tiling and/or scroll (chained)."""
         node = sample(mat, texture)
         uv_src, uv_pin = None, None
         if scale is not None:
@@ -192,6 +194,10 @@ def make_materials(data):
                 mat, unreal.MaterialExpressionPanner)
             pan.set_editor_property("speed_x", float(scroll[0]))
             pan.set_editor_property("speed_y", float(scroll[1]))
+            if uv_src is not None:
+                # Tile first, then drift: feed the scaled UVs into the
+                # panner's coordinate input (else one setting wins).
+                assert lib.connect_material_expressions(uv_src, uv_pin, pan, "Coordinate")
             uv_src, uv_pin = pan, ""
         if uv_src is not None:
             assert lib.connect_material_expressions(uv_src, uv_pin, node, "UVs")
@@ -209,8 +215,12 @@ def make_materials(data):
               for n in ("black", "water")}
     tx = os.path.join(data["dir"], "tex")
     proctex = {n: import_texture(os.path.join(tx, f"{n}.png"), f"T_Peat_{n}")
-               for n in ("leaf_card", "frond", "flame", "smoke", "glow",
-                         "burn_patch", "clouds")}
+               for n in ("frond", "flame", "smoke", "glow", "burn_patch")}
+    # Tiled textures need WRAP: leaf blobs tile 4x2, clouds 8x.
+    proctex["leaf_card"] = import_texture(os.path.join(tx, "leaf_card.png"),
+                                          "T_Peat_leaf_card", wrap=True)
+    proctex["clouds"] = import_texture(os.path.join(tx, "clouds.png"),
+                                       "T_Peat_clouds", wrap=True)
     raw = data["pbr"]
     bark = import_texture(os.path.join(raw, "bark_diff.jpg"), "T_Peat_Bark",
                           wrap=True)
@@ -234,6 +244,7 @@ def make_materials(data):
     out(mat, m, "", MP.MP_BASE_COLOR, "ground")
     out(mat, wire_uv(mat, mud_n, scale=400.0), "RGB", MP.MP_NORMAL,
         "ground-n")
+    out(mat, const(mat, 0.95), "", MP.MP_ROUGHNESS, "ground-rough")
     mat.set_editor_property("two_sided", True)
     _finish_mat("M_Peat_Ground")
     mats["ground"] = mat
@@ -264,6 +275,9 @@ def make_materials(data):
     out(mat, node, "RGB", MP.MP_BASE_COLOR, "canopy")
     out(mat, node, "A", MP.MP_OPACITY_MASK, "canopy-mask")
     out(mat, lift(mat, node, 0.18), "", MP.MP_EMISSIVE_COLOR, "canopy-lift")
+    # Foliage is matte: kill the wet-plastic specular streaks.
+    out(mat, const(mat, 0.0), "", MP.MP_SPECULAR, "canopy-spec")
+    out(mat, const(mat, 0.9), "", MP.MP_ROUGHNESS, "canopy-rough")
     mat.set_editor_property("two_sided", True)
     _finish_mat("M_Peat_Canopy")
     mats["canopy"] = mat
@@ -276,6 +290,8 @@ def make_materials(data):
     out(mat, node, "RGB", MP.MP_BASE_COLOR, "frond")
     out(mat, node, "A", MP.MP_OPACITY_MASK, "frond-mask")
     out(mat, lift(mat, node, 0.15), "", MP.MP_EMISSIVE_COLOR, "frond-lift")
+    out(mat, const(mat, 0.0), "", MP.MP_SPECULAR, "frond-spec")
+    out(mat, const(mat, 0.9), "", MP.MP_ROUGHNESS, "frond-rough")
     mat.set_editor_property("two_sided", True)
     _finish_mat("M_Peat_Frond")
     mats["frond"] = mat
@@ -283,12 +299,14 @@ def make_materials(data):
     # Flame: scrolling tongues, masked + hot emissive.
     mat = _new_mat("M_Peat_Flame")
     mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
-    mat.set_editor_property("opacity_mask_clip_value", 0.5)
+    # Clip 0.3 keeps the red tips; lift 1.6 keeps orange (3.0 blows to
+    # white through the tone mapper).
+    mat.set_editor_property("opacity_mask_clip_value", 0.3)
     node = wire_uv(mat, proctex["flame"], scroll=(0.0, -1.2))
     out(mat, sample(mat, meadow["black"]), "RGB", MP.MP_BASE_COLOR,
         "flame-base")
     out(mat, node, "A", MP.MP_OPACITY_MASK, "flame-mask")
-    out(mat, lift(mat, node, 3.0), "", MP.MP_EMISSIVE_COLOR, "flame-hot")
+    out(mat, lift(mat, node, 1.6), "", MP.MP_EMISSIVE_COLOR, "flame-hot")
     mat.set_editor_property("two_sided", True)
     _finish_mat("M_Peat_Flame")
     mats["flame"] = mat
@@ -298,8 +316,11 @@ def make_materials(data):
     mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     node = wire_uv(mat, proctex["smoke"], scroll=(0.0, -0.15))
     out(mat, node, "RGB", MP.MP_BASE_COLOR, "smoke")
-    out(mat, node, "A", MP.MP_OPACITY, "smoke-alpha")
-    out(mat, lift(mat, node, 0.5), "", MP.MP_EMISSIVE_COLOR, "smoke-lift")
+    sm = mul(mat)
+    assert lib.connect_material_expressions(node, "A", sm, "A")
+    assert lib.connect_material_expressions(const(mat, 1.2), "", sm, "B")
+    out(mat, sm, "", MP.MP_OPACITY, "smoke-alpha")
+    out(mat, lift(mat, node, 0.25), "", MP.MP_EMISSIVE_COLOR, "smoke-lift")
     mat.set_editor_property("two_sided", True)
     _finish_mat("M_Peat_Smoke")
     mats["smoke"] = mat
@@ -309,17 +330,21 @@ def make_materials(data):
     node = sample(mat, proctex["glow"])
     out(mat, sample(mat, meadow["black"]), "RGB", MP.MP_BASE_COLOR,
         "glow-base")
-    out(mat, lift(mat, node, 4.0), "", MP.MP_EMISSIVE_COLOR, "glow-hot")
+    out(mat, lift(mat, node, 2.5), "", MP.MP_EMISSIVE_COLOR, "glow-hot")
     mat.set_editor_property("two_sided", True)
     _finish_mat("M_Peat_Glow")
     mats["glow"] = mat
 
-    # Burn scar: charred ground, radial alpha.
+    # Burn scar: charred ground squared (dark enough to read against
+    # peat), radial alpha.
     mat = _new_mat("M_Peat_Burn")
     mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     bnode = sample(mat, burn)
+    bq = mul(mat)
+    assert lib.connect_material_expressions(bnode, "RGB", bq, "A")
+    assert lib.connect_material_expressions(bnode, "RGB", bq, "B")
     anode = sample(mat, proctex["burn_patch"])
-    out(mat, bnode, "RGB", MP.MP_BASE_COLOR, "burn")
+    out(mat, bq, "", MP.MP_BASE_COLOR, "burn")
     out(mat, anode, "A", MP.MP_OPACITY, "burn-alpha")
     _finish_mat("M_Peat_Burn")
     mats["burn"] = mat
@@ -332,6 +357,9 @@ def make_materials(data):
     assert lib.connect_material_expressions(pnode, "RGB", m, "A")
     assert lib.connect_material_expressions(pnode, "RGB", m, "B")
     out(mat, m, "", MP.MP_BASE_COLOR, "path")
+    # Dirt is matte: default specular mirror-blows at grazing angles.
+    out(mat, const(mat, 0.0), "", MP.MP_SPECULAR, "path-spec")
+    out(mat, const(mat, 0.95), "", MP.MP_ROUGHNESS, "path-rough")
     mat.set_editor_property("two_sided", True)
     _finish_mat("M_Peat_Path")
     mats["path"] = mat
@@ -339,10 +367,14 @@ def make_materials(data):
     # Clouds: unlit drifting bank on the sky dome.
     mat = _new_mat("M_Peat_Clouds")
     mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
-    cnode = wire_uv(mat, proctex["clouds"], scroll=(0.004, 0.001))
+    # Tiled 8x: puffs read at dome scale without fisheye smear.
+    cnode = wire_uv(mat, proctex["clouds"], scale=8.0, scroll=(0.002, 0.0005))
     out(mat, sample(mat, meadow["black"]), "RGB", MP.MP_BASE_COLOR,
         "cloud-base")
-    out(mat, cnode, "A", MP.MP_OPACITY, "cloud-alpha")
+    om = mul(mat)
+    assert lib.connect_material_expressions(cnode, "A", om, "A")
+    assert lib.connect_material_expressions(const(mat, 0.65), "", om, "B")
+    out(mat, om, "", MP.MP_OPACITY, "cloud-alpha")
     out(mat, lift(mat, cnode, 1.2), "", MP.MP_EMISSIVE_COLOR, "cloud-lit")
     mat.set_editor_property("two_sided", True)
     _finish_mat("M_Peat_Clouds")
@@ -395,6 +427,27 @@ def build_map(name, data, mats, meshes, burning):
                         (1, 1, 1), collide=False)
     ground.set_actor_label("PeatTerrain")
     stats["meshes"] += 1
+    # Ops pad: a small flat complex-collision plate in the cleared
+    # corner. Decides the shell mystery: if the pad blocks but the 2 km
+    # shell doesn't, complex collision fails at scale and the shell gets
+    # tiled. Doubles as the visible ops/landing pad.
+    pad_path = os.path.join(STATUS_DIR, "pad.obj")
+    ox, oy = data["ops"]["center_m"]
+    ogz = sample_height(data["heights"], ox, oy)
+    # OBJ space like every writer: x=north, y=-east (import negates Y),
+    # same (a,b,c),(b,d,c) order as the verified terrain writer.
+    px, py = oy * 100.0, ox * 100.0
+    with open(pad_path, "w") as fh:
+        fh.write("# ops pad\n")
+        for dx, dy in ((-600, -600), (-600, 600), (600, -600), (600, 600)):
+            fh.write(f"v {px + dx:.1f} {-(py + dy):.1f} {ogz:.1f}\n")
+        fh.write("f 1 2 3\nf 2 4 3\n")
+    pad = spawn_mesh((0.0, 0.0, 0.0),
+                     import_mesh(pad_path, "/Game/Peat", "SM_PeatPad",
+                                 complex_collision=True, nanite=False),
+                     mats["path"], (1, 1, 1), collide=True)
+    pad.set_actor_label("PeatPad")
+    stats["meshes"] += 1
     # Hidden collision shell: the 500x500 visual mesh silently cooks with
     # no collision; this 100x100 shell carries complex collision instead.
     shell = spawn_mesh((0.0, 0.0, 0.0), meshes["collision"], mats["ground"],
@@ -422,20 +475,23 @@ def build_map(name, data, mats, meshes, burning):
             gz = sample_height(data["heights"], ex, ny)
             ux, uy = ny * 100.0, ex * 100.0
             # Big fire: nested tongue cones + tall smoke columns.
-            for fz, fs in ((380.0, (5.5, 5.5, 4.2)),
+            for fz, fs in ((150.0, (6.5, 6.5, 3.0)),
                            (460.0, (3.6, 3.6, 5.2)),
                            (520.0, (2.2, 2.2, 6.0))):
                 spawn_mesh((ux, uy, gz + fz), meshes["cone"], mats["flame"],
                            fs, collide=False)
                 stats["flames"] += 1
-            for sz, ss in ((420.0, (3.0, 3.0, 9.0)),
-                           (700.0, (4.5, 4.5, 12.0))):
-                spawn_mesh((ux, uy, gz + sz), meshes["cube"], mats["smoke"],
-                           ss, collide=False)
-                stats["smoke"] += 1
-            spawn_mesh((ux, uy, gz + 18.0), meshes["plane"], mats["burn"],
-                       (9.0, 9.0, 1.0), collide=False)
-            spawn_mesh((ux, uy, gz + 30.0), meshes["plane"], mats["glow"],
+            # Smoke rides ABOVE the flame cores: enclosing them in an
+            # opaque-ish box hid the fire entirely (diagnosed live v2.4).
+            spawn_mesh((ux, uy, gz + 1000.0), meshes["cube"], mats["smoke"],
+                       (3.5, 3.5, 9.0), collide=False)
+            stats["smoke"] += 1
+            spawn_mesh((ux, uy, gz + 1700.0), meshes["cube"], mats["smoke"],
+                       (5.5, 5.5, 14.0), collide=False, yaw=30.0)
+            stats["smoke"] += 1
+            spawn_mesh((ux, uy, gz + 40.0), meshes["plane"], mats["burn"],
+                       (18.0, 18.0, 1.0), collide=False)
+            spawn_mesh((ux, uy, gz + 55.0), meshes["plane"], mats["glow"],
                        (5.0, 5.0, 1.0), collide=False)
             # Fire light: orange point glow, no shadows (10 shadow-casting
             # point lights would tank the frame budget).
@@ -445,7 +501,7 @@ def build_map(name, data, mats, meshes, burning):
             lamp.set_actor_label("FireLight")
             plc = lamp.get_component_by_class(unreal.PointLightComponent)
             plc.set_mobility(unreal.ComponentMobility.MOVABLE)
-            plc.set_editor_property("intensity", 6000.0)
+            plc.set_editor_property("intensity", 3500.0)
             plc.set_editor_property("attenuation_radius", 3500.0)
             plc.set_editor_property("light_color",
                                     unreal.Color(255, 120, 30, 255))
@@ -482,6 +538,15 @@ def build_map(name, data, mats, meshes, burning):
                         collide=False)
         ca.set_actor_label(label)
         stats["meshes"] += 1
+    # Apron: a dark ground plane far below + beyond the tile so the
+    # bright void never shows past the terrain edge (diagnosed: the
+    # "white half" was out-of-tile void, not a lighting bug). Never
+    # collides, never near the flight volume.
+    az = data["meta"]["dem_min_m"] * 100.0 - 200.0
+    ap = spawn_mesh((100000.0, 100000.0, az), meshes["plane"], mats["path"],
+                    (5000.0, 5000.0, 1.0), collide=False)
+    ap.set_actor_label("PeatApron")
+    stats["meshes"] += 1
     log(f"instances: {stats}")
 
     sun = unreal.EditorLevelLibrary.spawn_actor_from_class(
@@ -505,7 +570,7 @@ def build_map(name, data, mats, meshes, burning):
     sky_light.set_actor_label("SkyFill")
     sky_comp = sky_light.get_component_by_class(unreal.SkyLightComponent)
     sky_comp.set_mobility(unreal.ComponentMobility.MOVABLE)
-    sky_comp.set_editor_property("intensity", 1.0)
+    sky_comp.set_editor_property("intensity", 1.25)
     try:
         sky_comp.set_editor_property("real_time_capture", True)
     except Exception as exc:
@@ -567,6 +632,11 @@ def verify_map(name, expect_fire):
     assert n_mesh >= 6, f"{name}: only {n_mesh} mesh actors"
     assert n_ps == 1, f"{name}: {n_ps} player starts"
     assert gm_name == "AirSimGameMode", f"{name}: game mode {gm_name}"
+    shell = [a for a in actors if (a.get_actor_label() or "") == "PeatCollision"][0]
+    sh_col = shell.static_mesh_component.get_collision_enabled()
+    assert sh_col != unreal.CollisionEnabled.NO_COLLISION, \
+        f"{name}: shell collision {sh_col}"
+    log(f"verify {name}: shell collision={sh_col}")
     if expect_fire:
         assert n_mesh > 30, f"{name}: fire markers missing ({n_mesh})"
 
@@ -578,9 +648,11 @@ def main():
     meshes = {
         "terrain": import_mesh(os.path.join(data["dir"], "terrain.obj"),
                                "/Game/Peat", "SM_PeatTerrain"),
+        # Shell stays NON-Nanite: Nanite + complex collision cooked
+        # silently uncollidable (drone fell 10 m through; bisected live).
         "collision": import_mesh(os.path.join(data["dir"], "terrain_collision.obj"),
                                  "/Game/Peat", "SM_PeatCollision",
-                                 complex_collision=True),
+                                 complex_collision=True, nanite=False),
         "trunk": import_mesh(os.path.join(data["dir"], "trunk.obj"),
                                "/Game/Peat", "SM_GroveTrunk"),
         "frond": import_mesh(os.path.join(data["dir"], "frond.obj"),
