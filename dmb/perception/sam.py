@@ -36,6 +36,7 @@ from meta_sam_parser import (
 )
 
 from dmb.perception.edge import Detection, StubEdgePerception
+from dmb.perception.grounding import GridSpec, grid_to_pixel
 
 SAM_DEFAULT_BASE_URL = "https://api.meta.ai/v1"
 SAM_DEFAULT_MODEL = "sam-3.1"
@@ -43,8 +44,9 @@ SAM_DEFAULT_MODEL = "sam-3.1"
 # Concepts requested on every frame (all proven on aerial footage except
 # "animal", which is oracle-covered but unbaselined on real footage).
 BASE_CONCEPTS = ("road", "building", "person", "vehicle", "car", "animal")
-# Concepts whose frame coverage feeds the severity index.
-HAZARD_CONCEPTS = ("water", "smoke")
+# Concepts whose frame coverage feeds the severity index ("fire" = sim-seeded
+# point-prompt firebed masks on survey frames; no scenario requests it openly).
+HAZARD_CONCEPTS = ("water", "smoke", "fire")
 
 # Per-scenario extras keyed by base scenario name; `_large` variants resolve
 # to their base. Only concepts with observed matches are listed.
@@ -77,6 +79,8 @@ VICTIM_CONCEPTS = (("person", ("human", "child")), ("animal", ("animal",)))
 def concepts_for_scenario(name: str) -> tuple[str, ...]:
     """Concepts to segment for a scenario (base + hazard extras)."""
     base = name if name in SCENARIO_CONCEPTS else name.removesuffix("_large")
+    if base not in SCENARIO_CONCEPTS and name.startswith("firms_peat"):
+        base = "forest_fire"  # FIRMS peat scenarios share the fire extras
     if base not in SCENARIO_CONCEPTS:
         raise ValueError(
             f"Unknown scenario {name!r} (have {sorted(SCENARIO_CONCEPTS)})"
@@ -376,6 +380,120 @@ def build_seg_map(
     return seg
 
 
+def _prompted_record_valid(
+    label: str, png: bytes, record: SAMRecord, raster: bytes | None
+) -> bool:
+    """Photometric gate: prompted masks must look like their label.
+
+    A smoke point can land on a tree crown (dotted columns have gaps);
+    SAM then segments the crown. Smoke must be near-white, fire
+    orange-red. Undecodable frames/pixels pass (never gate tests).
+    """
+    if label not in ("fire", "smoke") or raster is None:
+        return True
+    try:
+        from PIL import Image as PILImage  # noqa: PLC0415
+        import io  # noqa: PLC0415
+
+        img = PILImage.open(io.BytesIO(png)).convert("RGB")
+        px = img.load()
+        w, h = img.size
+    except Exception:
+        return True
+    box = record.box
+    bw = box.x2 + 1 - box.x1
+    bh = box.y2 + 1 - box.y1
+    mh, mw = record.mask.height, record.mask.width
+    if mh <= 0 or mw <= 0 or len(raster) != mh * mw:
+        return True
+    vals: list[tuple[int, int, int]] = []
+    for r in range(mh):
+        base = r * mw
+        for c in range(mw):
+            if not raster[base + c]:
+                continue
+            x = int(box.x1 + (c + 0.5) * bw / mw)
+            y = int(box.y1 + (r + 0.5) * bh / mh)
+            if 0 <= x < w and 0 <= y < h:
+                vals.append(px[x, y])
+                if len(vals) >= 200:
+                    break
+        if len(vals) >= 200:
+            break
+    if not vals:
+        return True
+    r = sum(v[0] for v in vals) / len(vals)
+    g = sum(v[1] for v in vals) / len(vals)
+    b = sum(v[2] for v in vals) / len(vals)
+    if label == "smoke":
+        return (r + g + b) / 3 > 170
+    return r > 140 and r > b + 20
+
+
+def build_prompted_seg_map(
+    segmenter: Segmenter,
+    png: bytes,
+    prompts: list[tuple[str, str]],
+    grid: int = 64,
+) -> SegMap:
+    """Seg-map from explicit prompt texts filed under `labels`.
+
+    Same shape as build_seg_map but the caller supplies full prompt
+    strings (e.g. sim-seeded point prompts) instead of bare concepts.
+    Endpoint errors, empty outputs, undecodable masks, and
+    photometrically implausible masks degrade to empty records, never
+    raise.
+    """
+    seg = SegMap()
+    for label, prompt in prompts:
+        try:
+            text = segmenter(png, prompt)
+        except Exception:
+            text = ""
+        _, records = parse_sam_output(text)
+        rasters: list[bytes | None] = []
+        for record in records:
+            try:
+                rasters.append(decode_record_mask(record))
+            except Exception:
+                rasters.append(None)
+        gated = [
+            (rec, ras)
+            for rec, ras in zip(records, rasters)
+            if _prompted_record_valid(label, png, rec, ras)
+        ]
+        records = [rec for rec, _ in gated]
+        rasters = [ras for _, ras in gated]
+        prior = seg.results.get(label)
+        if prior is None:
+            seg.results[label] = SegConceptResult(label, records, rasters)
+        else:
+            prior.records.extend(records)
+            prior.rasters.extend(rasters)
+    for result in seg.results.values():
+        if result.records:
+            seg.frame_size = (result.records[0].box.w, result.records[0].box.h)
+            break
+    cells = {
+        concept: (
+            rasterize_concept(
+                [(r, ras) for r, ras in zip(result.records, result.rasters) if ras is not None],
+                seg.frame_size,
+                grid,
+            )
+            if seg.frame_size
+            else set()
+        )
+        for concept, result in seg.results.items()
+    }
+    seg.blockages = apply_overlap_rules(cells)
+    hazard_union: set[tuple[int, int]] = set().union(
+        *(cells.get(concept, set()) for concept in HAZARD_CONCEPTS)
+    )
+    seg.severity = severity_of(hazard_union, grid * grid)
+    return seg
+
+
 def seg_summary_line(seg: SegMap) -> str:
     """One-line seg-map digest for edge reports (deterministic order)."""
     counts = ",".join(f"{c}:{len(r.records)}" for c, r in seg.results.items())
@@ -468,6 +586,68 @@ def rubble_point_prompt(
 # camera grounding lands; without one no victim detection can ground.
 Grounding = Callable[[SAMRecord], tuple[int, int] | None]
 
+# Episode state -> [(label, (x, y) pixels)]: sim-seeded point prompts.
+PointProposer = Callable[[dict], list[tuple[str, tuple[int, int]]]]
+
+# Smoke-column prompt distances out along the radial (principal point
+# -> ignition pixel). Columns are dotted billboards with gaps, so two
+# depths make at least one puff likely.
+SMOKE_RADIAL_PX = (120, 260)
+
+
+# Max burning cells prompted per scan (each yields fire + smoke points).
+MAX_PROMPT_CELLS = 4
+
+# Second fire point per cell, offset +37 u-px (~5 m): a tree can stand
+# on the cell-center point (Kalimantan bed 2), and the offset still
+# lands inside the 14 m bed.
+FIRE_U_OFFSET_PX = 37
+
+
+def ignition_point_proposer(bridge) -> PointProposer:
+    """Fire/smoke point prompts for survey frames (firms scenarios).
+
+    Open-vocab smoke/fire concepts return zero on CG renders
+    (2026-11-04 probe), but sim-seeded point prompts on live burning
+    cells delineate precisely (firebed 1.0%, smoke 3.9% on the
+    Kalimantan nadir). Returns [] without a survey camera (native
+    path untouched).
+    """
+
+    def propose(state: dict) -> list[tuple[str, tuple[int, int]]]:
+        survey = getattr(bridge, "survey_camera", None)
+        if survey is None:
+            return []
+        burning = getattr(bridge, "burning_cells", []) or []
+        if not burning:
+            return []
+        cam, pose = survey.cam, survey.pose
+        grid = state.get("grid", {})
+        cell_m = getattr(bridge, "grid_cell_m", None) or 5.0
+        spec = GridSpec(
+            int(grid.get("width", 10)), int(grid.get("height", 10)), cell_m
+        )
+        out: list[tuple[str, tuple[int, int]]] = []
+        for x, y in burning[:MAX_PROMPT_CELLS]:
+            px = grid_to_pixel((int(x), int(y)), cam, pose, spec)
+            if px is None:
+                continue
+            u, v = px
+            out.append(("fire", (int(u), int(v))))
+            ou = int(u) + FIRE_U_OFFSET_PX
+            if ou < cam.width:
+                out.append(("fire", (ou, int(v))))
+            dx, dy = u - cam.cx, v - cam.cy
+            norm = (dx * dx + dy * dy) ** 0.5 or 1.0
+            for dist in SMOKE_RADIAL_PX:
+                su = int(u + dx / norm * dist)
+                sv = int(v + dy / norm * dist)
+                if 0 <= su < cam.width and 0 <= sv < cam.height:
+                    out.append(("smoke", (su, sv)))
+        return out
+
+    return propose
+
 
 class SAMEdgePerception(StubEdgePerception):
     """Trigger logic inherited; segmentation maps from SAM 3.1.
@@ -487,6 +667,8 @@ class SAMEdgePerception(StubEdgePerception):
         grounding: Grounding | None = None,
         max_scans: int | None = None,
         seg_provider: Callable[[bytes], SegMap] | None = None,
+        point_proposer: PointProposer | None = None,
+        fuse_stub: bool = False,
     ) -> None:
         super().__init__(bridge, config, budget)
         self.segmenter = segmenter
@@ -495,41 +677,73 @@ class SAMEdgePerception(StubEdgePerception):
         self.max_scans = max_scans  # None = unlimited (tests, oracle)
         # Direct SegMap source (oracle evals); bypasses segmenter+parse.
         self.seg_provider = seg_provider
+        # Sim-seeded point prompts (survey frames only).
+        self.point_proposer = point_proposer
+        # Fuse stub radius detections under the SAM seg-map (victims stay
+        # detectable where SAM has no grounding, e.g. survey frames).
+        self.fuse_stub = fuse_stub
         self.last_seg_map: SegMap | None = None
         self.scans_used = 0
         self.stale = False
 
     def _scan(self) -> tuple[list[Detection], list]:
         self.stale = False
-        if not self.bridge.drone.airborne:
+        drones = getattr(self.bridge, "drones", [self.bridge.drone])
+        if not any(d.airborne for d in drones):
             return [], []
         if self.max_scans is not None and self.scans_used >= self.max_scans:
-            # Scan budget exhausted: reuse the last seg-map, report stale.
+            # Scan budget exhausted: reuse the last seg-map, report stale
+            # (fused stub detections still flow; they cost no scans).
             self.stale = True
+            if self.fuse_stub:
+                return StubEdgePerception._scan(self)
             return [], []
         self.last_seg_map = None
         self.scans_used += 1
         try:
             state = self.bridge.get_state()
-            if self.concepts is not None:
-                concepts = list(self.concepts)
-            else:
-                try:
-                    concepts = list(concepts_for_scenario(str(state.get("scenario", ""))))
-                except ValueError:
-                    concepts = list(BASE_CONCEPTS)
             png = self.bridge.capture_frame(f"sam-step-{state.get('steps', 0)}")
             if png is None:
                 return [], []
-            if self.seg_provider is not None:
+            # Survey cache populates on capture; read it after.
+            survey = getattr(self.bridge, "survey_camera", None)
+            if (
+                survey is not None
+                and self.point_proposer is not None
+                and self.seg_provider is None
+            ):
+                # Survey frame: open-vocab is proven zero on CG renders,
+                # so scan prompted points only (fire/smoke delineation).
+                from PIL import Image as PILImage  # noqa: PLC0415
+                import io  # noqa: PLC0415
+
+                size = PILImage.open(io.BytesIO(png)).size
+                prompts = [
+                    (label, rubble_point_prompt(size, pt, [(8, 8)]))
+                    for label, pt in self.point_proposer(state)
+                ]
+                seg = build_prompted_seg_map(self.segmenter, png, prompts)
+            elif self.seg_provider is not None:
                 seg = self.seg_provider(png)
             else:
+                if self.concepts is not None:
+                    concepts = list(self.concepts)
+                else:
+                    try:
+                        concepts = list(
+                            concepts_for_scenario(str(state.get("scenario", "")))
+                        )
+                    except ValueError:
+                        concepts = list(BASE_CONCEPTS)
                 seg = build_seg_map(self.segmenter, png, concepts)
         except Exception:
             return [], []
         self.last_seg_map = seg
-        detections: list[Detection] = []
-        novel: list = []
+        if self.fuse_stub:
+            detections, novel = StubEdgePerception._scan(self)
+        else:
+            detections: list[Detection] = []
+            novel: list = []
         if self.grounding is not None:
             for concept, categories in VICTIM_CONCEPTS:
                 result = seg.results.get(concept)

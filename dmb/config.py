@@ -24,6 +24,7 @@ class Settings:
     edge_report_interval_steps: int = 5
     edge_max_snapshots_per_episode: int = 8
     edge_perception: str = "stub"
+    sam_fuse_stub: bool = False
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -43,6 +44,7 @@ class Settings:
                 _getenv("DMB_EDGE_MAX_SNAPSHOTS_PER_EPISODE", "8")
             ),
             edge_perception=_getenv("DMB_EDGE_PERCEPTION", "stub").lower() or "stub",
+            sam_fuse_stub=_getenv("DMB_SAM_FUSE_STUB", "0") == "1",
         )
 
     def require_provider(self, service: str) -> None:

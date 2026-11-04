@@ -28,6 +28,7 @@ affected issue.
 | Modal model id | `openai-api/modal/<name>` | verified (routing) |
 | Modal server | `infra/modal/vllm_server.py`: CUDA 12.9 image, vLLM 0.21.0, `Qwen/Qwen2.5-7B-Instruct` on A10G, `--enable-auto-tool-choice --tool-call-parser hermes` | verified 2026-10-27 |
 | Modal endpoint | `https://sanggusti--dmb-vllm-openai-compatible-serve.us-east.modal.run` (`/v1` suffix for `MODAL_BASE_URL`) | redeployed 2026-11-04 for firms_peat run; live (scales to zero when idle) |
+| Modal matrix (harder evals) | `vllm_mistral.py` (Mistral-7B-v0.3, mistral parser) + `vllm_qwen14b.py` (Qwen2.5-14B-AWQ, hermes + `--quantization awq`); endpoints `...--dmb-vllm-mistral-serve...` and `...--dmb-vllm-qwen14b-serve...` | deployed + tool-gated 2026-11-04; live (scale to zero) |
 | Modal auth | operator `modal setup` completed 2026-10-27 | working (unsandboxed; sandbox DNS blocks Modal client) |
 | Modal results | smoke accuracy 1.0; forest_fire limit-1 composite 0.627 (19 tool calls) | eval logs in `logs/`, registry `verify-modal-*` |
 
@@ -120,3 +121,9 @@ No provider-backed run has succeeded yet. First success criteria live in #1.
 - 2026-11-02: #50 code-complete: T0 peat/smolder/haze + forest_fire_peat
   scenario + T2 export path + visual target; live UE legs pending #46.
   UE 5.8.4 inventoried (Colosseum-incompatible; 5.6 required alongside).
+- 2026-11-04: harder evals done (docs/firms-sim2real/harder-evals.md):
+  world v2 (textured grass-soil ground, zero-velocity firebeds,
+  victim actors), SAM 3.1 prompted mode on survey renders
+  (fire:2, calibrated routes), 2-drone fleet + greedy_fleet,
+  16-cell matrix (Baseten muse-spark vision + 3 Modal models) all at
+  the 0.150/0-found floor as predicted; suite 178 green.

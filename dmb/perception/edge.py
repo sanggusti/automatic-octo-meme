@@ -113,7 +113,8 @@ class StubEdgePerception(EdgePerception):
     def _scan(self) -> tuple[list[Detection], list]:
         detections: list[Detection] = []
         novel: list = []
-        if not self.bridge.drone.airborne:
+        drones = getattr(self.bridge, "drones", [self.bridge.drone])
+        if not any(d.airborne for d in drones):
             return detections, novel
         try:
             tod_factor = TIME_OF_DAY_RADIUS_FACTOR[self.config.time_of_day]
@@ -123,26 +124,27 @@ class StubEdgePerception(EdgePerception):
                 f"(have {sorted(TIME_OF_DAY_RADIUS_FACTOR)})"
             ) from None
         radius = self.config.detection_radius * tod_factor
-        for victim in self.bridge.victims_within(self.config.detection_radius):
-            factor = MOBILITY_RADIUS_FACTOR.get(victim.mobility, 1.0)
-            dist = math.hypot(
-                victim.x - self.bridge.drone.x, victim.y - self.bridge.drone.y
-            )
-            if dist > radius * factor:
+        for drone in drones:
+            if not drone.airborne:
                 continue
-            vid = id(victim)
-            detections.append(
-                Detection(
-                    label=victim.category,
-                    x=victim.x,
-                    y=victim.y,
-                    confidence=MOBILITY_CONFIDENCE.get(victim.mobility, 0.9),
+            for victim in self.bridge.victims:
+                factor = MOBILITY_RADIUS_FACTOR.get(victim.mobility, 1.0)
+                dist = math.hypot(victim.x - drone.x, victim.y - drone.y)
+                if dist > radius * factor:
+                    continue
+                vid = id(victim)
+                detections.append(
+                    Detection(
+                        label=victim.category,
+                        x=victim.x,
+                        y=victim.y,
+                        confidence=MOBILITY_CONFIDENCE.get(victim.mobility, 0.9),
+                    )
                 )
-            )
-            if vid not in self._known_ids:
-                self._known_ids.add(vid)
-                novel.append(victim)
-                self.bridge.mark_found(victim)
+                if vid not in self._known_ids:
+                    self._known_ids.add(vid)
+                    novel.append(victim)
+                    self.bridge.mark_found(victim)
         return detections, novel
 
     def on_step(self, step: int) -> EdgeReport | None:

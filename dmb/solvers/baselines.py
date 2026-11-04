@@ -73,11 +73,64 @@ def random_policy(
     _step(bridge, edge, "land")
 
 
+def greedy_fleet_policy(
+    bridge: MockBridge, edge: StubEdgePerception, *, stride: int = 3, max_moves: int | None = None
+) -> None:
+    """Partitioned lawnmower: cells go to the nearest launch pad (Voronoi),
+    each drone snakes its own cells, moves interleave round-robin so the
+    step clock models parallel wall time."""
+    n = len(bridge.drones)
+    spots = [(d.x, d.y) for d in bridge.drones]
+    for i in range(n):
+        _step(bridge, edge, "arm", {"drone_idx": i})
+        _step(bridge, edge, "takeoff", {"altitude_m": 10, "drone_idx": i})
+    order: list[tuple[int, int]] = []
+    for y in range(0, bridge.height, stride):
+        xs = range(0, bridge.width, stride)
+        if (y // stride) % 2 == 1:
+            xs = reversed(list(xs))
+        order.extend((x, y) for x in xs)
+
+    def owner(cell: tuple[int, int]) -> int:
+        best, best_d = 0, None
+        for i, (sx, sy) in enumerate(spots):
+            d = abs(cell[0] - sx) + abs(cell[1] - sy)
+            if best_d is None or d < best_d:
+                best, best_d = i, d
+        return best
+
+    queues: list[list[tuple[int, int]]] = [[] for _ in range(n)]
+    for cell in order:
+        queues[owner(cell)].append(cell)
+    moves = 0
+    while any(queues):
+        if bridge.get_state()["steps"] >= bridge.step_budget - 2:
+            break
+        if max_moves is not None and moves >= max_moves:
+            break
+        for i in range(n):
+            if not queues[i]:
+                continue
+            if bridge.get_state()["steps"] >= bridge.step_budget - 2:
+                break
+            if max_moves is not None and moves >= max_moves:
+                break
+            x, y = queues[i].pop(0)
+            _step(bridge, edge, "goto", {"x": x, "y": y, "drone_idx": i})
+            moves += 1
+    for i in range(n):
+        if bridge.get_state()["steps"] >= bridge.step_budget:
+            break
+        _step(bridge, edge, "land", {"drone_idx": i})
+
+
 def _episode(metadata: dict, policy: str, *, stride: int = 3, max_moves: int | None = None) -> dict:
     bridge = MockBridge.from_metadata(dict(metadata))
     edge = StubEdgePerception(bridge, TriggerConfig(), FrameBudget(max_snapshots=8))
     if policy == "greedy":
         greedy_policy(bridge, edge, stride=stride, max_moves=max_moves)
+    elif policy == "greedy_fleet":
+        greedy_fleet_policy(bridge, edge, stride=stride, max_moves=max_moves)
     elif policy == "random":
         random_policy(bridge, edge, rng=random.Random(int(metadata.get("seed", 0))))
     else:

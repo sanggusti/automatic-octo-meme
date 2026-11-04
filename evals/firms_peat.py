@@ -20,3 +20,14 @@ def firms_peat():
         solver=[drone_mission()],
         scorer=[mission_score(), firms_spread_score()],
     )
+
+
+@task
+def firms_peat_fleet():
+    return Task(
+        dataset=build_samples(
+            "firms_peat_kalimantan_01", seeds=[7], fleet_size=2
+        ),
+        solver=[drone_mission()],
+        scorer=[mission_score(), firms_spread_score()],
+    )

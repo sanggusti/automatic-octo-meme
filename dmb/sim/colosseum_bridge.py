@@ -132,7 +132,7 @@ class ColosseumBridge(MockBridge):
         self.drone.airborne = str(state.landed_state) != "Landed"
 
     # -- primitives ------------------------------------------------------
-    def arm(self):
+    def arm(self, idx: int = 0):
         assert self._client is not None
         self._client.enableApiControl(True, self.vehicle_name)
         ok = bool(self._client.armDisarm(True, self.vehicle_name))
@@ -141,7 +141,7 @@ class ColosseumBridge(MockBridge):
             return self._observe("Refused: armDisarm rejected.")
         return self._observe("Armed (API control).")
 
-    def takeoff(self, altitude_m: float):
+    def takeoff(self, altitude_m: float, idx: int = 0):
         assert self._client is not None
         if not self.drone.armed:
             return self._observe("Refused: arm before takeoff.")
@@ -160,7 +160,7 @@ class ColosseumBridge(MockBridge):
         self._sync_from_telemetry()
         return self._observe(f"Takeoff to {self.drone.altitude_m:.1f} m.")
 
-    def goto(self, x: int, y: int):
+    def goto(self, x: int, y: int, idx: int = 0):
         assert self._client is not None
         if not self.drone.airborne:
             return self._observe("Refused: not airborne.")
@@ -181,7 +181,7 @@ class ColosseumBridge(MockBridge):
             )
         return self._observe(f"Arrived ({self.drone.x}, {self.drone.y}).")
 
-    def loiter(self, seconds: int = 5):
+    def loiter(self, seconds: int = 5, idx: int = 0):
         assert self._client is not None
         if not self.drone.airborne:
             return self._observe("Refused: not airborne.")
@@ -191,7 +191,7 @@ class ColosseumBridge(MockBridge):
         self._sync_from_telemetry()
         return self._observe(f"Loitered at ({self.drone.x}, {self.drone.y}).")
 
-    def land(self):
+    def land(self, idx: int = 0):
         assert self._client is not None
         self._client.landAsync(vehicle_name=self.vehicle_name).join()
         self.drone.airborne = False
@@ -200,7 +200,7 @@ class ColosseumBridge(MockBridge):
         self._sync_from_telemetry()
         return self._observe(f"Landed at ({self.drone.x}, {self.drone.y}).")
 
-    def rtl(self):
+    def rtl(self, idx: int = 0):
         assert self._client is not None
         self._client.goHomeAsync(vehicle_name=self.vehicle_name).join()
         self.drone.airborne = False

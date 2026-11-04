@@ -28,6 +28,12 @@ VICTIM_HIDDEN = (200, 170, 60)
 VICTIM_FOUND = (70, 190, 90)
 DRONE = (90, 160, 255)
 PATH = (90, 160, 255)
+FLEET_COLORS = [
+    (90, 160, 255),
+    (255, 170, 60),
+    (110, 220, 130),
+    (200, 130, 255),
+]
 
 
 def load_world(scenario: str, seed: int, world_hash: str) -> dict:
@@ -42,7 +48,7 @@ def load_world(scenario: str, seed: int, world_hash: str) -> dict:
     return meta
 
 
-def draw_frame(meta: dict, trail: list, found: set, caption: str) -> Image.Image:
+def draw_frame(meta: dict, trails: dict, found: set, caption: str) -> Image.Image:
     grid = meta["grid"]
     w, h = int(grid["width"]), int(grid["height"])
     img = Image.new("RGB", (w * CELL + 2 * MARGIN, h * CELL + 2 * MARGIN + HEADER), BG)
@@ -74,19 +80,22 @@ def draw_frame(meta: dict, trail: list, found: set, caption: str) -> Image.Image
         x0, y0, x1, y1 = cell_xy(int(v["x"]), int(v["y"]))
         color = VICTIM_FOUND if (v["x"], v["y"]) in found else VICTIM_HIDDEN
         d.ellipse([x0 + 12, y0 + 12, x1 - 12, y1 - 12], fill=color)
-    if len(trail) > 1:
-        d.line(
-            [
-                (MARGIN + (x + 0.5) * CELL, MARGIN + HEADER + (y + 0.5) * CELL)
-                for x, y in trail
-            ],
-            fill=PATH,
-            width=3,
-        )
-    if trail:
-        x, y = trail[-1]
-        x0, y0, x1, y1 = cell_xy(x, y)
-        d.rectangle([x0 + 6, y0 + 6, x1 - 6, y1 - 6], outline=DRONE, width=3)
+    for idx in sorted(trails):
+        trail = trails[idx]
+        color = FLEET_COLORS[idx % len(FLEET_COLORS)]
+        if len(trail) > 1:
+            d.line(
+                [
+                    (MARGIN + (x + 0.5) * CELL, MARGIN + HEADER + (y + 0.5) * CELL)
+                    for x, y in trail
+                ],
+                fill=color,
+                width=3,
+            )
+        if trail:
+            x, y = trail[-1]
+            x0, y0, x1, y1 = cell_xy(x, y)
+            d.rectangle([x0 + 6, y0 + 6, x1 - 6, y1 - 6], outline=color, width=3)
     d.text((MARGIN, 6), caption, fill=(220, 220, 220))
     return img
 
@@ -97,7 +106,13 @@ def render(path: str | Path, out_dir: str | Path) -> dict:
     meta = load_world(start["scenario"], int(start["seed"]), start["world_hash"])
     score = next((e for e in events if e["kind"] == "score"), {})
 
-    trail: list[tuple[int, int]] = [(0, 0)]
+    grid = meta["grid"]
+    gw, gh = int(grid["width"]), int(grid["height"])
+    pads = [(0, 0), (gw - 1, 0), (0, gh - 1), (gw - 1, gh - 1)]
+    fleet_size = int(start.get("fleet_size", 1) or 1)
+    trails: dict[int, list[tuple[int, int]]] = {
+        i: [pads[i % len(pads)]] for i in range(fleet_size)
+    }
     found: set[tuple[int, int]] = set()
     frames: list[Image.Image] = []
     for e in events:
@@ -110,19 +125,22 @@ def render(path: str | Path, out_dir: str | Path) -> dict:
                 raise ValueError(
                     "L2 predates pos enrichment; re-run the episode to replay it"
                 )
-            trail.append((int(pos[0]), int(pos[1])))
+            idx = int((e.get("args") or {}).get("drone_idx", 0))
+            trails.setdefault(idx, [pads[idx % len(pads)]]).append(
+                (int(pos[0]), int(pos[1]))
+            )
             args = ",".join(f"{k}={v}" for k, v in (e.get("args") or {}).items())
             frames.append(
                 draw_frame(
-                    meta, trail, found,
+                    meta, trails, found,
                     f"t={e['t']:.0f}s step={e['step']} {e.get('tool')}({args})",
                 )
             )
     if not frames:
-        frames.append(draw_frame(meta, trail, found, "no actions"))
+        frames.append(draw_frame(meta, trails, found, "no actions"))
     frames.append(
         draw_frame(
-            meta, trail, found,
+            meta, trails, found,
             f"done: composite={score.get('composite', 0):.3f} "
             f"found={len(found)}/{len(meta.get('victim_placements', []))}",
         )

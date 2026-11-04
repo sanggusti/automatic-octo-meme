@@ -287,3 +287,123 @@ def test_sam_edge_failure_degrades_quietly():
     assert edge.on_step(bridge.get_state()["steps"]) is None
     report = edge.on_demand(bridge.get_state()["steps"])
     assert report.detections == []
+
+
+def test_concepts_firms_includes_smoke():
+    concepts = concepts_for_scenario("firms_peat_kalimantan_01")
+    assert "smoke" in concepts and "person" in concepts
+
+
+def test_build_prompted_seg_map_labels():
+    from dmb.perception.sam import build_prompted_seg_map
+
+    seg = build_prompted_seg_map(
+        lambda png, prompt: _person_line(), b"png", [("fire", "prompt1")]
+    )
+    assert len(seg.results["fire"].records) == 1
+    assert seg.frame_size == (100, 100)
+    assert seg.severity.index >= 0.0
+
+
+def test_ignition_point_proposer_hits_firebed():
+    from dmb.perception.grounding import CameraModel, DronePose
+    from dmb.perception.render_frames import SurveyFrame
+    from dmb.perception.sam import ignition_point_proposer
+
+    class FakeBridge:
+        survey_camera = SurveyFrame(
+            b"png",
+            CameraModel(1280, 720, 60.0, 90.0, 90.0),
+            DronePose(59, 63, 150.0),
+        )
+        grid_cell_m = 5.0
+        burning_cells = [(58, 60)]
+
+    propose = ignition_point_proposer(FakeBridge())
+    state = {"grid": {"width": 120, "height": 120}}
+    points = propose(state)
+    fire = [pt for label, pt in points if label == "fire"]
+    smoke = [pt for label, pt in points if label == "smoke"]
+    assert len(fire) == 2 and len(smoke) == 2  # offset fire + two depths
+    assert fire[1][0] - fire[0][0] == 37
+    assert abs(fire[0][0] - 732) < 40
+    assert abs(fire[0][1] - 379) < 40
+    cx, cy = 640, 360
+    d_fire = abs(fire[0][0] - cx) + abs(fire[0][1] - cy)
+    for pt in smoke:
+        assert abs(pt[0] - cx) + abs(pt[1] - cy) > d_fire
+
+
+def test_fuse_stub_merges_detections():
+    bridge = MockBridge.from_metadata(dict(build_samples("forest_fire", seeds=[1])[0].metadata))
+    victim = bridge.victims[0]
+    edge = SAMEdgePerception(
+        bridge, TriggerConfig(), FrameBudget(8),
+        lambda png, concept: "",
+        fuse_stub=True,
+    )
+    bridge.act("arm", {})
+    bridge.act("takeoff", {"altitude_m": 10})
+    bridge.act("goto", {"x": victim.x, "y": victim.y})
+    report = edge.on_step(bridge.get_state()["steps"])
+    assert report is not None and report.detections != []
+    assert edge.last_seg_map is not None  # SAM side still scanned
+
+
+def test_stale_fuse_keeps_stub_detections():
+    bridge = MockBridge.from_metadata(dict(build_samples("forest_fire", seeds=[1])[0].metadata))
+    victim = bridge.victims[0]
+    edge = SAMEdgePerception(
+        bridge, TriggerConfig(), FrameBudget(8),
+        lambda png, concept: "",
+        max_scans=0,
+        fuse_stub=True,
+    )
+    bridge.act("arm", {})
+    bridge.act("takeoff", {"altitude_m": 10})
+    bridge.act("goto", {"x": victim.x, "y": victim.y})
+    detections, _ = edge._scan()
+    assert edge.stale is True
+    assert detections != []
+
+
+def test_survey_frame_loads_kalimantan():
+    from dmb.perception.render_frames import survey_frame
+
+    survey = survey_frame("firms_peat_kalimantan_01", 7)
+    assert survey is not None
+    assert survey.png[:8] == b"\x89PNG\r\n\x1a\n"
+    assert (survey.cam.width, survey.cam.height) == (1280, 720)
+    assert (survey.cam.pitch_deg, survey.cam.yaw_deg) == (90.0, 90.0)
+    assert survey_frame("forest_fire", 1) is None
+
+
+def test_bridge_capture_serves_survey_frame():
+    from dmb.perception.render_frames import survey_frame
+
+    meta = dict(build_samples("firms_peat_kalimantan_01", seeds=[7])[0].metadata)
+    bridge = MockBridge.from_metadata(meta)
+    png = bridge.capture_frame("test")
+    assert png == survey_frame("firms_peat_kalimantan_01", 7).png
+    assert bridge.survey_camera is not None
+
+
+def test_prompted_photometric_gate():
+    import io
+
+    from PIL import Image
+
+    from dmb.perception.sam import _prompted_record_valid
+
+    buf = io.BytesIO()
+    frame = Image.new("RGB", (100, 100), (250, 250, 250))
+    frame.paste(Image.new("RGB", (20, 20), (40, 90, 40)), (10, 10))  # crown
+    frame.save(buf, format="PNG")
+    png = buf.getvalue()
+    crown = _rec(10, 10, 29, 29, H=2, W=2)
+    white = _rec(60, 60, 79, 79, H=2, W=2)
+    full = bytes([1, 1, 1, 1])
+    assert _prompted_record_valid("smoke", png, white, full) is True
+    assert _prompted_record_valid("smoke", png, crown, full) is False
+    assert _prompted_record_valid("fire", png, crown, full) is False
+    assert _prompted_record_valid("smoke", b"not-a-png", crown, full) is True

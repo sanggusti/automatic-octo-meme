@@ -44,10 +44,11 @@ def make_drone_tools(
     tools: list[Tool] = []
     watch: Watcher = watcher or NullWatcher()
 
-    def _clock() -> tuple[float, int, int, int]:
+    def _clock(idx: int = 0) -> tuple[float, int, int, int]:
         state = bridge.get_state()
         step = int(state.get("steps", 0))
-        drone = state.get("drone", {})
+        drones = state.get("drones") or [state.get("drone", {})]
+        drone = drones[idx] if 0 <= idx < len(drones) else state.get("drone", {})
         return (
             float(state.get("sim_time", step * 5.0)),
             step,
@@ -77,8 +78,8 @@ def make_drone_tools(
             return f"{obs_text}\n[edge:{report.trigger}] {report.summary}"
         return obs_text
 
-    def _action(tool: str, args: dict, obs_text: str) -> None:
-        t, step, x, y = _clock()
+    def _action(tool: str, args: dict, obs_text: str, idx: int = 0) -> None:
+        t, step, x, y = _clock(idx)
         watch.on_event(
             "action", t, step, tool=tool, args=args, obs=obs_text[:500],
             pos=[x, y],
@@ -86,115 +87,137 @@ def make_drone_tools(
 
     @tool
     def arm():
-        async def execute() -> str:
+        async def execute(drone_idx: int) -> str:
             """Arm the drone motors.
+
+            Args:
+                drone_idx: Fleet drone to command (0-based; 0 when solo).
 
             Returns:
                 Arm result message.
             """
-            obs = bridge.act("arm", {}).text
-            _action("arm", {}, obs)
+            obs = bridge.act("arm", {"drone_idx": drone_idx}).text
+            _action("arm", {"drone_idx": drone_idx}, obs, drone_idx)
             return obs
 
         return execute
 
     @tool
     def takeoff():
-        async def execute(altitude_m: float) -> str:
+        async def execute(altitude_m: float, drone_idx: int) -> str:
             """Take off to an altitude and hover.
 
             Args:
                 altitude_m: Target altitude in metres (must be positive).
+                drone_idx: Fleet drone to command (0-based; 0 when solo).
 
             Returns:
                 Takeoff result plus any edge perception report.
             """
-            obs = bridge.act("takeoff", {"altitude_m": altitude_m})
-            _action("takeoff", {"altitude_m": altitude_m}, obs.text)
+            obs = bridge.act("takeoff", {"altitude_m": altitude_m, "drone_idx": drone_idx})
+            _action("takeoff", {"altitude_m": altitude_m, "drone_idx": drone_idx}, obs.text, drone_idx)
             return _with_edge_report(obs.text)
 
         return execute
 
     @tool
     def goto_location():
-        async def execute(x: int, y: int) -> str:
+        async def execute(x: int, y: int, drone_idx: int) -> str:
             """Fly to grid coordinates (x, y).
 
             Args:
                 x: Target x coordinate (0-based).
                 y: Target y coordinate (0-based).
+                drone_idx: Fleet drone to command (0-based; 0 when solo).
 
             Returns:
                 Movement result plus any edge perception report.
             """
-            obs = bridge.act("goto", {"x": x, "y": y})
-            _action("goto_location", {"x": x, "y": y}, obs.text)
+            obs = bridge.act("goto", {"x": x, "y": y, "drone_idx": drone_idx})
+            _action("goto_location", {"x": x, "y": y, "drone_idx": drone_idx}, obs.text, drone_idx)
             return _with_edge_report(obs.text)
 
         return execute
 
     @tool
     def loiter():
-        async def execute(seconds: int) -> str:
+        async def execute(seconds: int, drone_idx: int) -> str:
             """Hold position to let edge perception scan the area.
 
             Args:
                 seconds: How long to loiter.
+                drone_idx: Fleet drone to command (0-based; 0 when solo).
 
             Returns:
                 Loiter result plus any edge perception report.
             """
-            obs = bridge.act("loiter", {"seconds": seconds})
-            _action("loiter", {"seconds": seconds}, obs.text)
+            obs = bridge.act("loiter", {"seconds": seconds, "drone_idx": drone_idx})
+            _action("loiter", {"seconds": seconds, "drone_idx": drone_idx}, obs.text, drone_idx)
             return _with_edge_report(obs.text)
 
         return execute
 
     @tool
     def land():
-        async def execute() -> str:
+        async def execute(drone_idx: int) -> str:
             """Land at the current position.
+
+            Args:
+                drone_idx: Fleet drone to command (0-based; 0 when solo).
 
             Returns:
                 Landing result message.
             """
-            obs = bridge.act("land", {}).text
-            _action("land", {}, obs)
+            obs = bridge.act("land", {"drone_idx": drone_idx}).text
+            _action("land", {"drone_idx": drone_idx}, obs, drone_idx)
             return obs
 
         return execute
 
     @tool
     def return_to_launch():
-        async def execute() -> str:
+        async def execute(drone_idx: int) -> str:
             """Abort the mission: fly home and land.
+
+            Args:
+                drone_idx: Fleet drone to command (0-based; 0 when solo).
 
             Returns:
                 RTL result message.
             """
-            obs = bridge.act("rtl", {}).text
-            _action("return_to_launch", {}, obs)
+            obs = bridge.act("rtl", {"drone_idx": drone_idx}).text
+            _action("return_to_launch", {"drone_idx": drone_idx}, obs, drone_idx)
             return obs
 
         return execute
 
     @tool
     def get_telemetry():
-        async def execute() -> str:
+        async def execute(drone_idx: int) -> str:
             """Read position, altitude, battery, steps, and violations.
+
+            Args:
+                drone_idx: Fleet drone to command (0-based; 0 when solo).
 
             Returns:
                 Telemetry summary string.
             """
             state = bridge.get_state()
-            drone = state["drone"]
+            drones = state.get("drones") or [state["drone"]]
+            drone = drones[drone_idx] if 0 <= drone_idx < len(drones) else state["drone"]
             text = (
-                f"pos=({drone['x']},{drone['y']}) alt={drone['altitude_m']}m "
+                f"drone={drone_idx} pos=({drone['x']},{drone['y']}) alt={drone['altitude_m']}m "
                 f"airborne={drone['airborne']} battery={drone['battery_pct']}% "
                 f"steps={state['steps']}/{state['step_budget']} "
                 f"violations={state['safety_violations']}"
             )
-            _action("get_telemetry", {}, text)
+            if len(drones) > 1:
+                others = " ".join(
+                    f"#{i}@({d['x']},{d['y']}){'^' if d['airborne'] else 'v'} batt={d['battery_pct']}%"
+                    for i, d in enumerate(drones) if i != drone_idx
+                )
+                text += f" fleet: {others}"
+            _action("get_telemetry", {"drone_idx": drone_idx}, text, drone_idx)
             return text
 
         return execute
@@ -245,7 +268,14 @@ def make_drone_tools(
             assumed = cell_m is None
             if assumed:
                 cell_m = ASSUMED_CELL_M
-            text = render_route_map(seg, bridge.get_state(), cell_m, assumed)
+            survey = getattr(bridge, "survey_camera", None)
+            if survey is not None:
+                text = render_route_map(
+                    seg, bridge.get_state(), cell_m, False,
+                    cam=survey.cam, pose=survey.pose,
+                )
+            else:
+                text = render_route_map(seg, bridge.get_state(), cell_m, assumed)
             _action("request_route_map", {}, text)
             return text
 

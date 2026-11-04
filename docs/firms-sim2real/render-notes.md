@@ -94,3 +94,20 @@ shadows/AA, not layout. Nadir cam is offset 45 m from the ignition
 (a cam directly overhead whites out inside the 100 m+ smoke column);
 off-nadir columns show parallax lean, which is correct projection,
 not a bug.
+
+## 2026-11-04 world v2 (harder evals)
+
+- Ground: CC0 `aerial_grass_rock` 4k albedo via staged
+  `model://ground_tex` (box UV spans the tile; diffuse kept
+  near-white warm). Nadir/oblique read as grass-soil mosaic.
+- Fire: point flames retired (pillar law: ogre2 ignores
+  `<lifetime>`, height = velocity x age — A/B rig vs a 10 m pole at
+  t=50/200 s). Box `flame_bed` at ZERO velocity is a stable,
+  textured, pillar-free ember bed (faint quota shimmer only).
+  Emissive scorch abandoned (blows out to a flat orange square);
+  dark `burned_ground_01` decal kept.
+- People: seed-7 human/child draw as standing-person/male-visitor
+  includes (alias gap: SDF self-refs `model://person_standing`;
+  fetcher now aliases all referenced spellings).
+- Grab loop hardened: `LIBGL_ALWAYS_SOFTWARE=1`, all-cameras loop
+  (`/tmp/gzrender.sh`), GIF capture (`/tmp/gzcapture.sh`, 12x4 s).
