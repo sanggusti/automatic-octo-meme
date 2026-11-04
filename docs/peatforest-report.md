@@ -29,7 +29,8 @@ variants fly; all acceptance items green (2026-11-03).
 
 Bulk GeoTIFFs live in untracked `data/peatforest/`; map datasets go to
 HuggingFace (tag `3D maps`), never GitHub/LFS — this repo keeps
-metadata + entrypoints only.
+metadata + entrypoints only. Published: [sanggusti/peatforest-tilec-seed7](https://huggingface.co/datasets/sanggusti/peatforest-tilec-seed7)
+(#73); fetch entrypoint: `data/peatforest/README.md`.
 
 ## Reproducibility
 
