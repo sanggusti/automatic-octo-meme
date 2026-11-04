@@ -28,8 +28,13 @@ tsunami 7/56/37
 | `flash_flood` | Valley surge | 12×10 | Rising water; drifting hazards |
 | `flood` | Standing water | 14×10 | Large area; submerged power lines |
 | `earthquake` | Urban rubble | 10×10 | Trapped victims; unstable structures |
+| `earthquake_hard` | Urban rubble, hard | 60×60 | Variant of `earthquake`; 300 m town, band 0.73 (#80) |
 | `landslide` | Slope debris | 10×12 | Low visibility; extending slip face |
 | `landslide_large` | Slope debris, large | 20×20 | Variant of `landslide`; 2 slip faces |
+| `landslide_hard` | Slope debris, hard | 48×64 | Variant of `landslide`; 12° slope, band 0.70 (#80) |
+| `firms_peat_kalimantan_01` | Peat fire, FIRMS-pinned | 120×120 | Kalimantan hotspots; lush tropical stands (#79) |
+| `firms_peat_sumatra_01` | Peat fire, FIRMS-pinned | 120×120 | Sumatra hotspots (#79) |
+| `firms_peat_sumatra_02` | Peat fire, FIRMS-pinned | 120×120 | Sumatra hotspots, 2nd seed tile (#79) |
 
 ## Determinism contract
 
