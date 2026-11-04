@@ -9,6 +9,9 @@ Textures (Polyhaven, CC0-1.0, diffuse 4k JPG):
   aerial_grass_rock -- aerial moss-grass/soil mosaic; peat ground albedo
                       (the grass-soil gradation; no invented texture).
   burned_ground_01  -- charred ground; scorch decals under fire clusters.
+  asphalt_02        -- urban asphalt; quake town street grid albedo.
+  brown_mud_leaves_01 -- wet mud + leaf litter; landslide debris-flow albedo.
+  rock_face_03      -- exposed rock; landslide head-scarp albedo.
 """
 
 from __future__ import annotations
@@ -29,6 +32,22 @@ TEXTURES = {
     "burned_ground_01.jpg": {
         "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/burned_ground_01/burned_ground_01_diff_4k.jpg",
         "sha256": "d5cde28f8a7ad34ab3dcea8dc0f4ed836c16688e96c40695c760dfb052b46e89",
+    },
+    "asphalt_02.jpg": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/asphalt_02/asphalt_02_diff_4k.jpg",
+        "sha256": "d1601354507b6c4a46aa741b9134f9f23f738596a2bdcd20792e50ca554018e0",
+    },
+    "brown_mud_leaves_01.jpg": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/brown_mud_leaves_01/brown_mud_leaves_01_diff_4k.jpg",
+        "sha256": "bfca3a9db391ac14750705d6903daaf09e221baa2e60e97836efb8a4d3e230a4",
+    },
+    "brown_mud_02.jpg": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/brown_mud_02/brown_mud_02_diff_4k.jpg",
+        "sha256": "9477cb889f26c131c411a771cf057319738f857c6b7288747430122779106da5",
+    },
+    "rock_face_03.jpg": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/rock_face_03/rock_face_03_diff_4k.jpg",
+        "sha256": "83148536c125cee3a2e2fc1368c8851ad4c87aef8b8bb35c5129d82d223effb3",
     },
 }
 

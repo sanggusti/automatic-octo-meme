@@ -45,8 +45,9 @@ SAM_DEFAULT_MODEL = "sam-3.1"
 # "animal", which is oracle-covered but unbaselined on real footage).
 BASE_CONCEPTS = ("road", "building", "person", "vehicle", "car", "animal")
 # Concepts whose frame coverage feeds the severity index ("fire" = sim-seeded
-# point-prompt firebed masks on survey frames; no scenario requests it openly).
-HAZARD_CONCEPTS = ("water", "smoke", "fire")
+# point-prompt firebed masks on survey frames; no scenario requests it openly;
+# "rubble"/"debris" likewise from hazard-zone point prompts on quake/slide).
+HAZARD_CONCEPTS = ("water", "smoke", "fire", "rubble", "debris")
 
 # Per-scenario extras keyed by base scenario name; `_large` variants resolve
 # to their base. Only concepts with observed matches are listed.
@@ -78,7 +79,9 @@ VICTIM_CONCEPTS = (("person", ("human", "child")), ("animal", ("animal",)))
 
 def concepts_for_scenario(name: str) -> tuple[str, ...]:
     """Concepts to segment for a scenario (base + hazard extras)."""
-    base = name if name in SCENARIO_CONCEPTS else name.removesuffix("_large")
+    base = name
+    if base not in SCENARIO_CONCEPTS:
+        base = base.removesuffix("_large").removesuffix("_hard")
     if base not in SCENARIO_CONCEPTS and name.startswith("firms_peat"):
         base = "forest_fire"  # FIRMS peat scenarios share the fire extras
     if base not in SCENARIO_CONCEPTS:
@@ -654,6 +657,57 @@ def ignition_point_proposer(bridge) -> PointProposer:
                 sv = int(v + dy / norm * dist)
                 if 0 <= su < cam.width and 0 <= sv < cam.height:
                     out.append(("smoke", (su, sv)))
+        return out
+
+    return propose
+
+
+def hazard_point_proposer(bridge, label: str) -> PointProposer:
+    """Rubble/debris point prompts for survey frames (quake/slide).
+
+    Open-vocab damage nouns return zero on CG renders (prior finding),
+    so collapse/slip-face hazard zones seed point prompts instead, one
+    center + one offset point per zone. Zones gated by
+    ``active_from_phase`` are skipped until their phase (aftershock
+    rifts prompt only after they activate). Returns [] without a
+    survey camera (native path untouched). On the sloped slide frame
+    the nadir projection is approximate (flat-ground assumption);
+    prompts still land inside the multi-metre debris path.
+    """
+
+    def propose(state: dict) -> list[tuple[str, tuple[int, int]]]:
+        survey = getattr(bridge, "survey_camera", None)
+        if survey is None:
+            return []
+        hazards = list(getattr(bridge, "hazards", []) or [])
+        if not hazards:
+            return []
+        try:
+            phase_idx = bridge.current_phase_index()
+        except Exception:
+            phase_idx = 0
+        cam, pose = survey.cam, survey.pose
+        grid = state.get("grid", {})
+        cell_m = getattr(bridge, "grid_cell_m", None) or 5.0
+        spec = GridSpec(
+            int(grid.get("width", 10)), int(grid.get("height", 10)), cell_m
+        )
+        out: list[tuple[str, tuple[int, int]]] = []
+        for hz in hazards[:MAX_PROMPT_CELLS]:
+            try:
+                if int(hz.get("active_from_phase", 0)) > phase_idx:
+                    continue
+                cx, cy = int(hz.get("x", -1)), int(hz.get("y", -1))
+            except (ValueError, TypeError):
+                continue
+            px = grid_to_pixel((cx, cy), cam, pose, spec)
+            if px is None:
+                continue
+            u, v = int(px[0]), int(px[1])
+            out.append((label, (u, v)))
+            ou = u + FIRE_U_OFFSET_PX
+            if ou < cam.width:
+                out.append((label, (ou, v)))
         return out
 
     return propose
