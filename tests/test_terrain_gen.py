@@ -64,7 +64,7 @@ def test_terrain_gen_swatches_bgr(tmp_path):
 
     _run(tmp_path)
     swatches = tmp_path / "swatches"
-    assert len(list(swatches.glob("*.png"))) == 10
+    assert len(list(swatches.glob("*.png"))) == 11
     flame = Image.open(swatches / "flame.png").convert("RGB")
     assert flame.size == (4, 4)
     assert flame.getpixel((0, 0)) == (26, 122, 255)

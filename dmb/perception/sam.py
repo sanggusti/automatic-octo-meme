@@ -418,14 +418,24 @@ def sam_from_env() -> Segmenter:
 
 
 def openai_segmenter(
-    png: bytes, concept: str, *, model: str, base_url: str, api_key: str
+    png: bytes,
+    concept: str,
+    *,
+    model: str,
+    base_url: str,
+    api_key: str,
+    timeout: float = 600.0,
 ) -> str:
-    """Default segmenter over the Meta Model API Responses endpoint."""
+    """Default segmenter over the Meta Model API Responses endpoint.
+
+    Native 720p frames exceed the OpenAI default 60 s timeout; 600 s
+    covers observed SAM-3.1 latency with headroom (live peat 2026-11).
+    """
     import base64
 
     from openai import OpenAI  # noqa: PLC0415
 
-    client = OpenAI(base_url=base_url, api_key=api_key)
+    client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
     response = client.responses.create(
         model=model,
         input=[

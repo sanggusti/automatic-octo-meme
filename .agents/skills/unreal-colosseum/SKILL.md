@@ -41,6 +41,13 @@ UnrealEditor-cmd.exe <X>.uproject -run=pythonscript -script='<s>.py' -unattended
 Prefer `Start-Process` over `&` for engine binaries (the call operator
 flakes with "a device which does not exist" in sandboxed shells), and
 never pipe UBT output through `Select-Object -First N` (it kills UBT).
+Under a shell sandbox, engine/editor/package/game runs need one-shot
+escalation: the sandbox blocks the editor's DerivedDataCache
+(`No DDC nodes are writable` fatal) and all project-dir writes.
+The sandbox ALSO blocks loopback TCP: in-sandbox RPC clients fail
+with WinError 10013, which naive wait-loops misreport as "port never
+opened" while the game LISTENs fine. Run every survey/RPC client
+escalated too, and make wait-loops re-raise PermissionError distinctly.
 
 ## Custom env recipe (Colosseum `unreal_custenv` + verified fixes)
 
@@ -85,9 +92,64 @@ never pipe UBT output through `Select-Object -First N` (it kills UBT).
   markers must be `NO_COLLISION` or the drone wedges on them.
 - Grid mapping: grid (x=east, y=north) -> UE cm (X=y*500, Y=x*500);
   PlayerStart at the grid CORNER (trees sit at cell centers).
+- OBJ import: Z is verbatim (Y-up renders as a wall) but Y is NEGATED
+  (`(x,y,z)->(X,-Y,Z)`, bisected live: +y OBJ content landed at NED -y
+  while builder markers at +Y landed +y). Writers emit y=-east_cm with
+  +Z winding; pin the sign in tests. Builder-placed actors use +Y=east
+  directly (no import involved) — never "fix" them for the mirror.
+- Sidecar units: height sidecars consumed against cm meshes must be cm
+  (a metres-under-`heights_cm` slip buried 4000 trees and spawned the
+  drone 6.8 m underground, hidden because single-sided terrain is
+  see-through from below). Assert scale in tests AND at build time
+  (spawn inside the DEM cm range).
+- Collision: `set_collision_enabled(NO_COLLISION)` REVERTS to BLOCK on
+  save+reload (probed); use `set_collision_profile_name("NoCollision")`
+  + assert the readback, and re-probe after reload. Auto-decomposed
+  hulls on km-scale merged meshes are solid rock (drone spawns inside,
+  low moves die, works only above ~15 m): merged meshes get NO
+  collision; terrain collision comes from a hidden decimated shell
+  (101x101, complex-as-simple, cm + full span, pinned by test).
+  Tree collision returns with the foliage/Quixel pass.
   Spawn-adjacent trees crowd the default camera (brown mass at frame
   edge is the nearest trunk, not a bug); check framing on the ground
   capture before trusting angles.
+- Nanite: every material on a Nanite mesh needs
+  `set_editor_property("used_with_nanite", True)` (no `b_` prefix —
+  probed) or the mesh renders default-gray in the package (warning
+  only in the log). Masked foliage + Nanite is fine; unproven blob
+  UVs + alpha clip can eat whole canopies (see peatforest gaps).
+- NEVER `connect_material_expressions` a
+  `MaterialExpressionVertexColor`: it access-violates the editor
+  (3x, even RGBA source). Bake tints into textures or use constants.
+
+## Packaged-build laws (peatforest v3, all bisected live)
+
+- Lumen hangs packaged map loads past ~10M tris (Nanite-off still
+  hangs, Lumen-off loads, null-RHI loads). Bake
+  `[ConsoleVariables] r.DynamicGlobalIlluminationMethod=0` +
+  `r.ReflectionMethod=0` into DefaultEngine.ini (the
+  RendererSettings property spellings do NOT take) and re-verify
+  with a no-flags launch + census.
+- Build all maps in ONE `-cmd` session after ONE import pass.
+  Split sessions rot the first map's ribbon refs via
+  delete-recreate staleness (white dashes); single session +
+  reload-verify fixed it. verify_map reload-asserts guard the
+  classic empty-first-save.
+- Clean-cook (`Saved/Cooked` + `Saved/StagedBuilds`) after ANY
+  merged-mesh size change. Incremental cook sailed a 10x-shrunk
+  mesh and the map hung every load; clean cook fixed it.
+  Incremental is for materials/lights only.
+- Census-assert every boot: PeatBefore = 41 actors / 13 staticmesh.
+  301 staticmesh = the GameDefaultMap fallback (CLI map args never
+  resolve /Game/Peat/: short names miss, leading / parses as a
+  switch). Working combo: GameDefaultMap=PeatBefore + simLoadLevel
+  full path for the other map.
+- Never `reset()` mid-transition: poll the census to the target
+  count, settle 30 s, then reset. Resetting into a transition
+  bricks RPC (game alive, server dead). Skip simLoadLevel when
+  the census already shows the target map.
+- `-RenderOffScreen` pegs the GPU at 99% even idle (t.MaxFPS does
+  not cap it). Kill the game between bursts.
 
 ## Verify on packaged builds, not `-game`
 
@@ -109,7 +171,20 @@ chase those. Incremental cooks take ~20s; delete `Saved/Cooked` +
   ignored and the join hangs forever even at clear altitude (verified
   twice, not just when wedged). Fire-and-poll the pose with a timeout,
   then `hoverAsync().join()` to cancel before the next leg.
-  `rotateToYawAsync().join()` and `takeoff/landAsync().join()` are safe.
+  `rotateToYawAsync().join()` and `takeoffAsync().join()` are safe.
+  `landAsync().join()` is hang-safe but RACES: it completes after 10x ~0
+  z-vel reads, which can all land before the motors spool, no-op'ing
+  mid-air (twice observed). Touch down with open-loop
+  `moveByVelocityAsync(0,0,v,dur)` + pose/collided proof instead.
+- `simSetVehiclePose` is coarse-only: long jumps land ~+/-25 m off and
+  can leave the drone swinging (rolled frames). Teleport-coarse, then
+  `fly_to` exact + orientation-gated settle (pitch/roll < 3°) before
+  every capture. Take off BEFORE teleporting (holds stick); teleports
+  without a prior takeoff free-fall.
+- Units reminder: `to_quaternion` takes RADIANS, `rotateToYawAsync`
+  takes DEGREES. Takeoff target is z=-2.0 (SimpleFlight params), not
+  -3. Duration-bounded `moveByVelocityAsync(...).join()` is safe
+  (unlike position joins).
 - Custom main-branch builds need the MAIN PythonClient
   (`D:\programming\Colosseum\PythonClient`); the beta client connects
   but cannot parse their poses. The beta binary needs the beta client.
@@ -120,6 +195,17 @@ chase those. Incremental cooks take ~20s; delete `Saved/Cooked` +
 - Kill orphaned `python.exe` after a timeout kill (the watchdog kills
   the wrapper, the RPC client survives and holds no lock, but confuses
   the next run).
+- Kill packaged games BY NAME, never by single pid: the launcher
+  bootstrap spawns an inner exe that survives the parent. A stale
+  inner holds RPC 41451 (and the `.ucas` pak), so the next boot
+  bind-fails into `FMessageDialog::Open` — an invisible modal that
+  blocks the game thread headless. Sweep by name + `netstat` before
+  every launch and every package.
+- AirSim `LogMessage`/`LogMessageString` are SCREEN-ONLY (all UE_LOG
+  lines commented out): "Cannot start RpcLib Server" / "Error at
+  startup" / "API server is disabled" never reach the packaged log.
+  A listening-but-unreachable port + frozen log = suspect the modal
+  or a second instance, not the map.
 
 ## Recording
 

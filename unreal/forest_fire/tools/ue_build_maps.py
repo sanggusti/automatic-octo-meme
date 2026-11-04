@@ -193,8 +193,13 @@ def spawn_mesh(location, mesh, material, scale, collide=True):
     comp.set_static_mesh(mesh)
     comp.set_material(0, material)
     actor.set_actor_scale3d(unreal.Vector(*scale))
+    # Profile, not setter: set_collision_enabled reverts to BLOCK on
+    # save+reload (probed); the "NoCollision" profile persists.
     if not collide:
-        comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        comp.set_collision_profile_name("NoCollision")
+        got = comp.get_collision_enabled()
+        if got != unreal.CollisionEnabled.NO_COLLISION:
+            raise RuntimeError(f"collision disable failed ({got}); aborting")
     return actor
 
 
