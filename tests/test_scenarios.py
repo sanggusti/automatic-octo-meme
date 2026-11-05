@@ -9,7 +9,9 @@ def test_all_scenarios_load():
         "firms_peat_sumatra_01",
         "firms_peat_sumatra_02",
         "flash_flood",
+        "flash_flood_hard",
         "flood",
+        "flood_hard",
         "forest_fire",
         "forest_fire_large",
         "forest_fire_peat",
@@ -17,6 +19,7 @@ def test_all_scenarios_load():
         "landslide_hard",
         "landslide_large",
         "tsunami",
+        "tsunami_hard",
     ]
     for name in list_scenarios():
         config = load_scenario(name)

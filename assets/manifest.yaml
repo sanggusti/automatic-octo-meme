@@ -71,6 +71,12 @@ actors:
     generator: procedural scaled quadruped capsule (documented in physics-assets.md)
     license: generated (no external file)
     use: T1 wildlife until a CC0 animal mesh is vetted (GSO hits are toy scans)
+  rescue-randy-sitting:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Rescue%20Randy%20Sitting/8/Rescue%20Randy%20Sitting.zip
+    version: 8
+    sha256: 611ef9ddadfba16be25963f2b79967fec6493c638ca77d0652f18fbbc5202fb3
+    license: CC0-1.0
+    use: flood/tsunami stranded-victim figures (rooftops, high ground)
 drones:
   # Handled by per-value provenance in assets/drones/*.yaml (#3), not hub zips.
   quad_iris_class:
@@ -112,6 +118,11 @@ textures:
     sha256: 83148536c125cee3a2e2fc1368c8851ad4c87aef8b8bb35c5129d82d223effb3
     license: CC0-1.0
     use: landslide exposed-scar rock albedo (head-scarp zone above the mud flow).
+  sand_01:
+    url: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/sand_01/sand_01_diff_4k.jpg
+    sha256: 882e10aec3a0dd2eae3bc5c726f2dbb5c1aa8748211ec19d90728430d3253795
+    license: CC0-1.0
+    use: tsunami beach/coast + flash-flood riverbank sand albedo. Fetched by assets/textures/fetch_textures.py, staged as model://ground_tex/... .
 
 gis:
   # Peatforest tile C (#64): bbox [114.318, -2.86, 114.336, -2.842].
@@ -291,3 +302,63 @@ structures:
     sha256: 0024d723c7089b8371a6c559bfd69b63d4a3086c10d38208927b2d4d53b7c3fd
     license: CC-BY-4.0
     use: slide debris boulder variant
+  coast-water:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Coast%20Water/3/Coast%20Water.zip
+    version: 3
+    sha256: 41235ac0fec648ef6e31f392c06400daa39177eb5a5e5fa26bc346b93142059d
+    license: CC-BY-4.0
+    use: RETIRED 2026-11-05 -- renders ~100x over nominal 60 m and cubemap-blue; unusable for gray floodwater. Kept pinned for reference.
+  wam-v:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/wam-v/4/wam-v.zip
+    version: 4
+    sha256: 7c411e108339fe9723ff92284addb692ac55532e4bacfa839ef4f1b85d615214
+    license: CC-BY-4.0
+    use: flood/tsunami rescue boat (USV proxy)
+  pier:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pier/3/Pier.zip
+    version: 3
+    sha256: 3c95c266b014d83c46716c0d1fe3c721890568e6b315d54a4e0a13e89d1298e6
+    license: CC0-1.0
+    use: tsunami coast wooden pier
+  dock:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Dock/6/Dock.zip
+    version: 6
+    sha256: 9db10af9cc755436a0700e0c6328818e7fd68258970c3b481cf849f046183bb6
+    license: CC-BY-4.0
+    use: flood marina dock / tsunami harbor gate
+  truss-bridge:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Truss%20bridge/3/Truss%20bridge.zip
+    version: 3
+    sha256: 709e70862529454bfdcc7e5ac5e2aaca5e3343516f9843e9f285a045dfb0f685
+    license: CC0-1.0
+    use: flash-flood valley bridge crossing
+  school:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/School/3/School.zip
+    version: 3
+    sha256: 72f73deebc26e3694ba5877e92be3f83d4cbf0daca6ec7d37fdb84cde621297a
+    license: CC0-1.0
+    use: flood town shelter landmark
+  thrift-shop:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Thrift%20shop/3/Thrift%20shop.zip
+    version: 3
+    sha256: 8af06352b6178cabc27f43f14ffda186a1ad38410558ff47ca0f9a80f4a94822
+    license: CC0-1.0
+    use: flood town shop rows
+  depot:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/Depot/6/Depot.zip
+    version: 6
+    sha256: 760ac4a94293a39aaf878243e927608bebdea006ea97e55d95264007548f07de
+    license: CC-BY-4.0
+    use: tsunami port warehouse (PBR)
+  mb-marker-buoy-red:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/mb_marker_buoy_red/5/mb_marker_buoy_red.zip
+    version: 5
+    sha256: 698792ca233e04cd1b2491ed3c4df034157abdb4a182e802384e150bac0abe7e
+    license: CC-BY-4.0
+    use: flood channel marker buoys
+  mb-round-buoy-orange:
+    url: https://fuel.gazebosim.org/1.0/OpenRobotics/models/mb_round_buoy_orange/5/mb_round_buoy_orange.zip
+    version: 5
+    sha256: 728486e08eaf0ad00a282fcbf723d379909932802fc5922b213d9067be26641d
+    license: CC-BY-4.0
+    use: tsunami debris-field marker buoys
