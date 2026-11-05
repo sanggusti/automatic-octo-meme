@@ -12,6 +12,7 @@ Textures (Polyhaven, CC0-1.0, diffuse 4k JPG):
   asphalt_02        -- urban asphalt; quake town street grid albedo.
   brown_mud_leaves_01 -- wet mud + leaf litter; landslide debris-flow albedo.
   rock_face_03      -- exposed rock; landslide head-scarp albedo.
+  sand_01           -- sand; tsunami beach/coast + flash-flood riverbank albedo.
 """
 
 from __future__ import annotations
@@ -48,6 +49,10 @@ TEXTURES = {
     "rock_face_03.jpg": {
         "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/rock_face_03/rock_face_03_diff_4k.jpg",
         "sha256": "83148536c125cee3a2e2fc1368c8851ad4c87aef8b8bb35c5129d82d223effb3",
+    },
+    "sand_01.jpg": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/sand_01/sand_01_diff_4k.jpg",
+        "sha256": "882e10aec3a0dd2eae3bc5c726f2dbb5c1aa8748211ec19d90728430d3253795",
     },
 }
 

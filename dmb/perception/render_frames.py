@@ -42,6 +42,7 @@ def frames_roots() -> list[Path]:
     return [
         docs / "firms-sim2real" / "renders",
         docs / "quake-slide-sim2real" / "renders",
+        docs / "flood-sim2real" / "renders",
     ]
 
 

@@ -35,6 +35,9 @@ tsunami 7/56/37
 | `firms_peat_kalimantan_01` | Peat fire, FIRMS-pinned | 120×120 | Kalimantan hotspots; lush tropical stands (#79) |
 | `firms_peat_sumatra_01` | Peat fire, FIRMS-pinned | 120×120 | Sumatra hotspots (#79) |
 | `firms_peat_sumatra_02` | Peat fire, FIRMS-pinned | 120×120 | Sumatra hotspots, 2nd seed tile (#79) |
+| `flood_hard` | Standing water, hard | 60×60 | Variant of `flood`; 300 m drowned town, band 0.73 |
+| `flash_flood_hard` | Valley surge, hard | 48×64 | Variant of `flash_flood`; swollen river + bridge, band 0.76 |
+| `tsunami_hard` | Coastal surge, hard | 60×60 | Variant of `tsunami`; surf + scour + town, band 0.73 |
 
 ## Determinism contract
 

@@ -58,6 +58,12 @@ def drone_mission() -> Solver:
                 proposer = hazard_point_proposer(bridge, "rubble")
             elif scenario == "landslide_hard":
                 proposer = hazard_point_proposer(bridge, "debris")
+            elif scenario in (
+                "flood_hard",
+                "flash_flood_hard",
+                "tsunami_hard",
+            ):
+                proposer = hazard_point_proposer(bridge, "water")
             else:
                 proposer = ignition_point_proposer(bridge)
             edge = SAMEdgePerception(
