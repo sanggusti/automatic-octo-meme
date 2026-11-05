@@ -1,6 +1,7 @@
 # Flood hard environments + harder evals
 
-Three water worlds at hard difficulty, built from real internet
+Tracked in #81, shipped in #82. Three water worlds at hard
+difficulty, built from real internet
 assets (Fuel models, Polyhaven textures) against Wikimedia Commons
 look references, evaluated with the same harder-eval harness as
 FIRMS peat (`docs/firms-sim2real/harder-evals.md`) and
