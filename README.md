@@ -7,9 +7,9 @@ Gazebo-first (headless-capable, distributed). Inference: Baseten
 frontier + Modal-hosted HuggingFace. All runs tracked.
 
 - **Worlds**: hard disaster scenarios built from real internet
-  assets (Fuel models, Polyhaven textures) against real look
-  references — NASA FIRMS fire data, Commons aerials — rendered
-  and verified in Gazebo.
+  assets (Fuel models, Polyhaven textures) and checked against
+  real look references (NASA FIRMS fire data, Commons aerials),
+  rendered and verified in Gazebo.
 - **Agents**: ReAct drone missions (single + 2-drone fleets) over
   an ArduPilot-derived tool surface, with stub or SAM 3.1 edge
   perception (segmentation maps → routes + severity).
@@ -29,53 +29,75 @@ Footage (promo loops, run replays, final frames, segmentation
 maps, survey frames) lives next to each report under
 `docs/<batch>/renders/`.
 
-## Headline findings
+## Results
 
-Across **93 scored LLM cells** (Baseten `muse-spark-open-1026`
-with vision + Modal Qwen2.5-7B / Mistral-7B-v0.3 /
-Qwen2.5-14B-AWQ, SAM vs stub, single vs fleet):
+Across **93 scored LLM episodes** (Baseten
+`muse-spark-open-1026` with vision + Modal Qwen2.5-7B /
+Mistral-7B-v0.3 / Qwen2.5-14B-AWQ, SAM vs stub, single vs
+fleet) plus 12 scripted greedy baselines:
 
-- **6 victims found in 93 episodes.** Per batch: FIRMS 0/16,
-  quake/slide 1/32, flood 5/45. The vision frontier accounts
-  for 4 of the 6; tsunami is a perfect 0/14. The evals are
-  hard by design — and frontier performance is near the floor,
-  as predicted.
-- **Scripted coverage beats every LM.** Greedy sweep finds
-  1–2 victims per environment at ~2% coverage; LLM agents
-  cover ~0.1–0.5% then submit. Coverage is unscored, so
-  early-submit is score-rational — the next scorer iteration
-  needs coverage/closest-approach shaping before scale or
-  finetuning can show signal.
-- **SAM 3.1 perception validates; routes don't discriminate
-  yet.** Prompted segmentation goes 8/8 on firebeds, rubble,
-  debris, and floodwater with calibrated severity, and SAM
-  episodes request route maps — but with ~0 located victims,
-  routes cannot separate runs.
-- **Mistral-7B cannot run the harness**: 0 actions in every
-  completed cell (100–200k tokens of fenced pseudo-calls)
-  plus context-overflow errors; Qwen14b needs a token cap
-  against slow-worker hangs.
-- **Worlds are the easy part now**: the builder + render-verify
-  + survey-frame pipeline ships a new hard environment with
-  full evals in one batch (see [#81](https://github.com/sanggusti/automatic-octo-meme/issues/81)
+![Episodes with at least one victim found, LLM vs greedy by batch](docs/img/results-finds-by-batch.png)
+
+*LLM agents find a victim in 6/93 episodes; the scripted sweep
+finds victims in every quake/slide and flood cell. FIRMS peat
+(120×120) floors everyone.*
+
+| Batch | LLM episodes w/ ≥1 find | Victims (LLM) | Greedy episodes w/ ≥1 find | Victims (greedy) |
+|---|---|---|---|---|
+| FIRMS peat | 0/16 | 0 | 0/2 | 0 |
+| Quake/slide | 1/32 | 1 | 4/4 | 4 |
+| Flood | 5/45 | 5 | 6/6 | 8 |
+
+![Episodes with at least one victim found, by model](docs/img/results-finds-by-model.png)
+
+*The vision frontier accounts for 4 of the 6 LLM finds;
+Mistral-7B never acts (0 actions in every completed cell,
+100–200k tokens of fenced pseudo-calls, plus 3
+context-overflow errors). Tsunami is a perfect 0/14.*
+
+![Mean map coverage, LLM vs greedy by batch](docs/img/results-coverage.png)
+
+*Acting LLM agents cover ~0.1–0.5% of the map then submit;
+coverage is unscored, so early-submit is score-rational.
+Greedy covers ~2% and finds 1–2 victims per environment.*
+
+Findings:
+
+- **The evals are hard by design, and frontier performance
+  sits near the floor.** 6 victims in 93 episodes; per batch
+  FIRMS 0/16, quake/slide 1/32, flood 5/45.
+- **Scripted coverage beats every LM.** The next scorer
+  iteration needs coverage/closest-approach shaping before
+  scale or finetuning can show signal.
+- **SAM 3.1 perception works; routes add nothing yet.**
+  Prompted segmentation goes 8/8 on firebeds, rubble, debris,
+  and floodwater with calibrated severity, and SAM episodes
+  request route maps. With ~0 located victims, routes cannot
+  separate runs.
+- **New worlds are cheap to add.** The builder +
+  render-verify + survey-frame pipeline ships a hard
+  environment with full evals in one batch (see
+  [#81](https://github.com/sanggusti/automatic-octo-meme/issues/81)
   / [#82](https://github.com/sanggusti/automatic-octo-meme/pull/82)
-  for the checklist shape).
+  for the checklist).
 
+Figures are generated from the batch tables by
+[generate_results_graphs.py](docs/img/generate_results_graphs.py).
 Open next steps: scorer shaping (#35), recon advisor + human
 baselines (#5), release bar (#29).
 
 ## Repo map
 
-- `dmb/` — package (scenarios, sim bridge, tools, solvers,
+- `dmb/`: package (scenarios, sim bridge, tools, solvers,
   scorers, perception incl. SAM, watcher)
-- `evals/` — inspect-ai tasks (`flood.py`, `quake_slide.py`,
+- `evals/`: inspect-ai tasks (`flood.py`, `quake_slide.py`,
   `firms_peat.py`, packs, baselines)
-- `scenarios/` — disaster definitions (+ `*_hard` variants)
-- `assets/` — pinned Fuel/Polyhaven manifest, fetchers, Gazebo
+- `scenarios/`: disaster definitions (+ `*_hard` variants)
+- `assets/`: pinned Fuel/Polyhaven manifest, fetchers, Gazebo
   world builders (`assets/structures/build_*.py`)
-- `infra/` — sim image + Modal vLLM serving definitions
-- `docs/` — technical docs + per-batch reports and footage
-- `runs/`, `logs/` — tracked trajectories and eval logs
+- `infra/`: sim image + Modal vLLM serving definitions
+- `docs/`: technical docs + per-batch reports and footage
+- `runs/`, `logs/`: tracked trajectories and eval logs
 
 ## Quickstart
 
@@ -89,7 +111,7 @@ INSPECT_TRACE_FILE=./logs/trace.log \
   .venv/bin/inspect eval evals/forest_fire.py --model mockllm/model --limit 1
 ```
 
-Harder evals (keys + serving required — see
+Harder evals (keys + serving required; see
 [runbooks](docs/runbooks.md) and [inference](docs/inference.md)):
 
 ```bash
@@ -107,10 +129,10 @@ DMB_SAM_MAX_SCANS_PER_EPISODE=1 DMB_SAM_FUSE_STUB=1 \
 Start at [docs/](docs/README.md): architecture, compute split,
 action surface, edge perception, SAM segmaps, scenarios,
 metrics, inference, tracking, human evals, assets, runbooks,
-roadmap — plus the per-batch sim-to-real reports with
+roadmap, plus the per-batch sim-to-real reports with
 performance tables and footage.
 
 ## Contributing
 
-Issues first, then PR, then merge, then close — no direct pushes
+Issues first, then PR, then merge, then close. No direct pushes
 to `main`. See [runbooks](docs/runbooks.md#publishing-flow-required).
